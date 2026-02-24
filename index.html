@@ -536,7 +536,6 @@
             const h = mainCanvas.height;
 
             // 2. Base Effect Layer (Blur + Skin Color Correction)
-            // クリップやdestination-outを使用せず安全に合成を行う
             const baseEffect = createOffscreenCanvas(w, h);
             applySafeBlur(baseEffect.ctx, mainCanvas, 8); // 肌の凹凸をぼかす
 
@@ -554,6 +553,7 @@
                 baseEffect.ctx.globalAlpha = 0.12;
                 baseEffect.ctx.drawImage(noiseTexture, 0, 0);
             }
+            baseEffect.ctx.globalCompositeOperation = 'source-over'; // Ret to default
 
             // 3. Mustache Boost Layer
             const mPath = new Path2D();
@@ -574,22 +574,23 @@
             const mMaskBlurred = createOffscreenCanvas(w, h);
             applySafeBlur(mMaskBlurred.ctx, mMaskShape.canvas, 6);
 
-            const mBoost = createOffscreenCanvas(w, h);
-            mBoost.ctx.fillStyle = skinColor;
-            mBoost.ctx.globalAlpha = Math.min(0.35, t * 0.35);
-            mBoost.ctx.fillRect(0, 0, w, h);
-            mBoost.ctx.globalCompositeOperation = 'screen';
-            mBoost.ctx.globalAlpha = Math.min(0.5, t * 0.5);
-            mBoost.ctx.fillRect(0, 0, w, h);
+            const mBoostInfo = createOffscreenCanvas(w, h);
+            mBoostInfo.ctx.fillStyle = skinColor;
+            mBoostInfo.ctx.globalAlpha = Math.min(0.35, t * 0.35);
+            mBoostInfo.ctx.fillRect(0, 0, w, h);
+            mBoostInfo.ctx.globalCompositeOperation = 'screen';
+            mBoostInfo.ctx.globalAlpha = Math.min(0.5, t * 0.5);
+            mBoostInfo.ctx.fillRect(0, 0, w, h);
 
-            // Apply Mask (Mustache)
-            mBoost.ctx.globalCompositeOperation = 'destination-in';
-            mBoost.ctx.drawImage(mMaskBlurred.canvas, 0, 0);
+            // Create masked Mustache boost
+            const maskedBoost = createOffscreenCanvas(w, h);
+            maskedBoost.ctx.drawImage(mMaskBlurred.canvas, 0, 0);
+            maskedBoost.ctx.globalCompositeOperation = 'source-in';
+            maskedBoost.ctx.drawImage(mBoostInfo.canvas, 0, 0);
 
-            // Add Boost to Base
-            baseEffect.ctx.globalCompositeOperation = 'source-over';
+            // Draw mustache over base effect
             baseEffect.ctx.globalAlpha = 1.0;
-            baseEffect.ctx.drawImage(mBoost.canvas, 0, 0);
+            baseEffect.ctx.drawImage(maskedBoost.canvas, 0, 0);
 
             // 4. Overall Beard Mask & Exclusions
             const beardPath = new Path2D();
@@ -641,13 +642,16 @@
             const finalMask = createOffscreenCanvas(w, h);
             applySafeBlur(finalMask.ctx, beardMaskShape.canvas, 10);
 
-            // Apply the final mask to the whole effect
-            baseEffect.ctx.globalCompositeOperation = 'destination-in';
-            baseEffect.ctx.drawImage(finalMask.canvas, 0, 0);
+            // 6. Draw the masked effect over the original image
+            // We create a new canvas to hold the masked effect
+            const maskedEffect = createOffscreenCanvas(w, h);
+            maskedEffect.ctx.drawImage(finalMask.canvas, 0, 0);
+            maskedEffect.ctx.globalCompositeOperation = 'source-in';
+            maskedEffect.ctx.drawImage(baseEffect.canvas, 0, 0);
 
-            // 6. Draw to Main Canvas
+            // Draw to Main Canvas on top of the original image
             mainCtx.globalAlpha = t;
-            mainCtx.drawImage(baseEffect.canvas, 0, 0);
+            mainCtx.drawImage(maskedEffect.canvas, 0, 0);
             mainCtx.globalAlpha = 1.0;
         }
 
@@ -718,4 +722,5 @@
 </body>
 
 </html>
+
 
