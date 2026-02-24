@@ -494,27 +494,105 @@
             } catch (e) { return { r: 220, g: 180, b: 160 }; }
         }
 
-        // --- Render V7.4 Logic (iPad Bug Fix) ---
+        // --- Render V7.4 Logic (iPad Bug Fix - Manual Blur) ---
+        function applyManualBlur(ctx, width, height, radius) {
+            const imgData = ctx.getImageData(0, 0, width, height);
+            const data = imgData.data;
+            const w = width;
+            const h = height;
+
+            // Simple Box Blur implementation (faster than Gaussian for manual calc)
+            // Need to do this horizontally then vertically
+            const passes = 2; // more passes = closer to gaussian, but slower
+
+            // Create temporary buffer to avoid allocating inside loop
+            const temp = new Uint8ClampedArray(data.length);
+
+            for (let pass = 0; pass < passes; pass++) {
+                // Horizontal pass
+                for (let y = 0; y < h; y++) {
+                    for (let x = 0; x < w; x++) {
+                        let r = 0, g = 0, b = 0, a = 0, count = 0;
+                        for (let ix = -radius; ix <= radius; ix++) {
+                            const curX = x + ix;
+                            if (curX >= 0 && curX < w) {
+                                const idx = (y * w + curX) * 4;
+                                r += data[idx];
+                                g += data[idx + 1];
+                                b += data[idx + 2];
+                                a += data[idx + 3];
+                                count++;
+                            }
+                        }
+                        const outIdx = (y * w + x) * 4;
+                        temp[outIdx] = r / count;
+                        temp[outIdx + 1] = g / count;
+                        temp[outIdx + 2] = b / count;
+                        temp[outIdx + 3] = a / count;
+                    }
+                }
+
+                // Vertical pass
+                for (let x = 0; x < w; x++) {
+                    for (let y = 0; y < h; y++) {
+                        let r = 0, g = 0, b = 0, a = 0, count = 0;
+                        for (let iy = -radius; iy <= radius; iy++) {
+                            const curY = y + iy;
+                            if (curY >= 0 && curY < h) {
+                                const idx = (curY * w + x) * 4;
+                                r += temp[idx];
+                                g += temp[idx + 1];
+                                b += temp[idx + 2];
+                                a += temp[idx + 3];
+                                count++;
+                            }
+                        }
+                        const outIdx = (y * w + x) * 4;
+                        data[outIdx] = r / count;
+                        data[outIdx + 1] = g / count;
+                        data[outIdx + 2] = b / count;
+                        data[outIdx + 3] = a / count;
+                    }
+                }
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+        }
+
         function applySafeBlur(targetCtx, sourceCanvas, radius) {
-            // iOS device check
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
+
             if (isIOS) {
-                // Downscale to reduce load and avoid filter bugs on iOS Safari
-                const scale = 0.5;
-                const dw = Math.floor(sourceCanvas.width * scale);
-                const dh = Math.floor(sourceCanvas.height * scale);
+                // For iOS, completely avoid ctx.filter and use manual pixel manipulation
+                // Downscale massively to make manual blur performant enough
+                const scale = 0.25;
+                const dw = Math.max(1, Math.floor(sourceCanvas.width * scale));
+                const dh = Math.max(1, Math.floor(sourceCanvas.height * scale));
+
                 const tmp = createOffscreenCanvas(dw, dh);
                 tmp.ctx.drawImage(sourceCanvas, 0, 0, dw, dh);
 
-                targetCtx.save();
-                targetCtx.filter = `blur(${radius * scale}px)`;
+                // Apply manual CPU-based blur
+                applyManualBlur(tmp.ctx, dw, dh, Math.max(1, Math.floor(radius * scale)));
+
+                // Draw back scaled up (browser handles interpolation)
                 targetCtx.drawImage(tmp.canvas, 0, 0, sourceCanvas.width, sourceCanvas.height);
-                targetCtx.restore();
             } else {
                 targetCtx.save();
                 targetCtx.filter = `blur(${radius}px)`;
                 targetCtx.drawImage(sourceCanvas, 0, 0, sourceCanvas.width, sourceCanvas.height);
                 targetCtx.restore();
+            }
+        }
+
+        function createMaskPath(ctx, w, h, points, isClosed = true) {
+            ctx.beginPath();
+            if (points && points.length > 0) {
+                ctx.moveTo(points[0].x, points[0].y);
+                for (let i = 1; i < points.length; i++) {
+                    ctx.lineTo(points[i].x, points[i].y);
+                }
+                if (isClosed) ctx.closePath();
             }
         }
 
@@ -534,125 +612,99 @@
 
             const w = mainCanvas.width;
             const h = mainCanvas.height;
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
 
-            // 2. Base Effect Layer (Blur + Skin Color Correction)
-            const baseEffect = createOffscreenCanvas(w, h);
-            applySafeBlur(baseEffect.ctx, mainCanvas, 8); // 肌の凹凸をぼかす
+            // Create solid filled mask for the beard area instead of complex composite chains
+            const beardMask = createOffscreenCanvas(w, h);
 
-            baseEffect.ctx.globalCompositeOperation = 'soft-light';
-            baseEffect.ctx.fillStyle = skinColor;
-            baseEffect.ctx.globalAlpha = Math.min(1.0, t * 0.9);
-            baseEffect.ctx.fillRect(0, 0, w, h);
+            // Generate total beard shape
+            const beardShape = [];
+            beardShape.push(jaw[0]);
+            for (let i = 1; i <= 16; i++) beardShape.push(jaw[i]);
+            beardShape.push({ x: rightEye[1].x, y: rightEye[4].y + (nose[8].y - rightEye[4].y) * 0.25 });
+            beardShape.push({ x: nose[8].x, y: nose[8].y + 8 });
+            beardShape.push({ x: nose[6].x, y: nose[6].y + 2 });
+            beardShape.push({ x: nose[4].x, y: nose[4].y + 8 });
+            beardShape.push({ x: leftEye[1].x, y: leftEye[4].y + (nose[4].y - leftEye[4].y) * 0.25 });
 
-            baseEffect.ctx.globalCompositeOperation = 'color';
-            baseEffect.ctx.globalAlpha = Math.min(1.0, t * 0.8);
-            baseEffect.ctx.fillRect(0, 0, w, h);
+            createMaskPath(beardMask.ctx, w, h, beardShape);
+            beardMask.ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+            beardMask.ctx.fill();
+
+            // Clear out lips and nose from the mask
+            beardMask.ctx.globalCompositeOperation = 'destination-out';
+            const outerLip = mouth.slice(0, 12);
+            createMaskPath(beardMask.ctx, w, h, outerLip);
+            beardMask.ctx.fillStyle = 'rgba(0,0,0,1)';
+            beardMask.ctx.fill();
+            beardMask.ctx.lineWidth = 10;
+            beardMask.ctx.lineJoin = 'round';
+            beardMask.ctx.strokeStyle = 'rgba(0,0,0,1)';
+            beardMask.ctx.stroke();
+
+            const noseShape = [nose[0], nose[4], { x: nose[6].x, y: nose[6].y + 5 }, nose[8]];
+            createMaskPath(beardMask.ctx, w, h, noseShape);
+            beardMask.ctx.fill();
+            beardMask.ctx.stroke();
+
+            beardMask.ctx.globalCompositeOperation = 'source-over';
+
+            // Blur the hard edges of this mask (CPU-bound for iOS)
+            const finalMask = createOffscreenCanvas(w, h);
+            applySafeBlur(finalMask.ctx, beardMask.canvas, 15);
+
+            // Now, we need the "Effect" to apply inside this mask.
+            // For older iPads, applying soft-light and color blend modes across full canvas can fail.
+            // We will create the skin color overlay directly.
+
+            const effectLayer = createOffscreenCanvas(w, h);
+
+            // 1. Draw the blurred original (simulating smooth skin)
+            applySafeBlur(effectLayer.ctx, mainCanvas, 8);
+
+            // 2. Tint it with the skin color
+            effectLayer.ctx.globalCompositeOperation = 'soft-light';
+            effectLayer.ctx.fillStyle = skinColor;
+            effectLayer.ctx.globalAlpha = Math.min(1.0, t * 0.9);
+            effectLayer.ctx.fillRect(0, 0, w, h);
+
+            effectLayer.ctx.globalCompositeOperation = 'color';
+            effectLayer.ctx.globalAlpha = Math.min(1.0, t * 0.8);
+            effectLayer.ctx.fillRect(0, 0, w, h);
 
             if (noiseTexture) {
-                baseEffect.ctx.globalCompositeOperation = 'overlay';
-                baseEffect.ctx.globalAlpha = 0.12;
-                baseEffect.ctx.drawImage(noiseTexture, 0, 0);
+                effectLayer.ctx.globalCompositeOperation = 'overlay';
+                effectLayer.ctx.globalAlpha = 0.12;
+                effectLayer.ctx.drawImage(noiseTexture, 0, 0);
             }
-            baseEffect.ctx.globalCompositeOperation = 'source-over'; // Ret to default
 
-            // 3. Mustache Boost Layer
-            const mPath = new Path2D();
-            mPath.moveTo(nose[4].x - 2, nose[4].y);
-            mPath.lineTo(nose[6].x, nose[6].y - 2);
-            mPath.lineTo(nose[8].x + 2, nose[8].y);
-            mPath.lineTo(mouth[6].x + 2, mouth[6].y);
-            mPath.lineTo(mouth[4].x, mouth[4].y - 2);
-            mPath.lineTo(mouth[3].x, mouth[3].y - 2);
-            mPath.lineTo(mouth[2].x, mouth[2].y - 2);
-            mPath.lineTo(mouth[0].x - 2, mouth[0].y);
-            mPath.closePath();
+            // Mask the effect layer using our manually blurred mask
+            // We use standard pixels to avoid composite broken edges on iPad
+            if (isIOS) {
+                // Manual Alpha Masking via pixel manipulation (slow but 100% reliable)
+                const effectData = effectLayer.ctx.getImageData(0, 0, w, h);
+                const maskData = finalMask.ctx.getImageData(0, 0, w, h);
 
-            const mMaskShape = createOffscreenCanvas(w, h);
-            mMaskShape.ctx.fillStyle = 'white';
-            mMaskShape.ctx.fill(mPath);
+                for (let i = 0; i < effectData.data.length; i += 4) {
+                    // Multiply alpha of effect by the Red channel (luminance) of the mask
+                    effectData.data[i + 3] = (effectData.data[i + 3] * maskData.data[i]) / 255;
+                }
+                effectLayer.ctx.putImageData(effectData, 0, 0);
 
-            const mMaskBlurred = createOffscreenCanvas(w, h);
-            applySafeBlur(mMaskBlurred.ctx, mMaskShape.canvas, 6);
+                // Draw the masked effect back to main canvas
+                mainCtx.globalAlpha = t;
+                mainCtx.drawImage(effectLayer.canvas, 0, 0);
+                mainCtx.globalAlpha = 1.0;
+            } else {
+                // For PC, standard composite is fine
+                effectLayer.ctx.globalCompositeOperation = 'destination-in';
+                effectLayer.ctx.globalAlpha = 1.0;
+                effectLayer.ctx.drawImage(finalMask.canvas, 0, 0);
 
-            const mBoostInfo = createOffscreenCanvas(w, h);
-            mBoostInfo.ctx.fillStyle = skinColor;
-            mBoostInfo.ctx.globalAlpha = Math.min(0.35, t * 0.35);
-            mBoostInfo.ctx.fillRect(0, 0, w, h);
-            mBoostInfo.ctx.globalCompositeOperation = 'screen';
-            mBoostInfo.ctx.globalAlpha = Math.min(0.5, t * 0.5);
-            mBoostInfo.ctx.fillRect(0, 0, w, h);
-
-            // Create masked Mustache boost
-            const maskedBoost = createOffscreenCanvas(w, h);
-            maskedBoost.ctx.drawImage(mMaskBlurred.canvas, 0, 0);
-            maskedBoost.ctx.globalCompositeOperation = 'source-in';
-            maskedBoost.ctx.drawImage(mBoostInfo.canvas, 0, 0);
-
-            // Draw mustache over base effect
-            baseEffect.ctx.globalAlpha = 1.0;
-            baseEffect.ctx.drawImage(maskedBoost.canvas, 0, 0);
-
-            // 4. Overall Beard Mask & Exclusions
-            const beardPath = new Path2D();
-            const rCheekX = rightEye[1].x;
-            const rCheekY = rightEye[4].y + (nose[8].y - rightEye[4].y) * 0.25;
-            const lCheekX = leftEye[1].x;
-            const lCheekY = leftEye[4].y + (nose[4].y - leftEye[4].y) * 0.25;
-
-            beardPath.moveTo(jaw[0].x, jaw[0].y);
-            for (let i = 1; i <= 16; i++) beardPath.lineTo(jaw[i].x, jaw[i].y);
-            beardPath.lineTo(jaw[16].x, jaw[16].y);
-            beardPath.lineTo(rCheekX, rCheekY);
-            beardPath.lineTo(nose[8].x, nose[8].y + 8);
-            beardPath.lineTo(nose[6].x, nose[6].y + 2);
-            beardPath.lineTo(nose[4].x, nose[4].y + 8);
-            beardPath.lineTo(lCheekX, lCheekY);
-            beardPath.lineTo(jaw[0].x, jaw[0].y);
-            beardPath.closePath();
-
-            const beardMaskShape = createOffscreenCanvas(w, h);
-            beardMaskShape.ctx.fillStyle = 'white';
-            beardMaskShape.ctx.fill(beardPath);
-
-            // Exclusions (Lips, Nose)
-            const eCtx = beardMaskShape.ctx;
-            eCtx.globalCompositeOperation = 'destination-out';
-
-            // Lips
-            const outerLip = mouth.slice(0, 12);
-            eCtx.beginPath();
-            eCtx.moveTo(outerLip[0].x, outerLip[0].y);
-            for (let i = 1; i < outerLip.length; i++) eCtx.lineTo(outerLip[i].x, outerLip[i].y);
-            eCtx.closePath();
-            eCtx.fillStyle = 'black'; eCtx.fill();
-            eCtx.lineWidth = 6; eCtx.strokeStyle = 'black'; eCtx.lineJoin = 'round'; eCtx.stroke();
-
-            // Nose
-            eCtx.beginPath();
-            eCtx.moveTo(nose[0].x, nose[0].y);
-            eCtx.lineTo(nose[4].x, nose[4].y);
-            eCtx.lineTo(nose[6].x, nose[6].y + 5);
-            eCtx.lineTo(nose[8].x, nose[8].y);
-            eCtx.closePath();
-            eCtx.fillStyle = 'black'; eCtx.fill();
-            eCtx.lineWidth = 6; eCtx.strokeStyle = 'black'; eCtx.stroke();
-            eCtx.globalCompositeOperation = 'source-over'; // reset
-
-            // 5. Blur the final mask to create soft boundaries
-            const finalMask = createOffscreenCanvas(w, h);
-            applySafeBlur(finalMask.ctx, beardMaskShape.canvas, 10);
-
-            // 6. Draw the masked effect over the original image
-            // We create a new canvas to hold the masked effect
-            const maskedEffect = createOffscreenCanvas(w, h);
-            maskedEffect.ctx.drawImage(finalMask.canvas, 0, 0);
-            maskedEffect.ctx.globalCompositeOperation = 'source-in';
-            maskedEffect.ctx.drawImage(baseEffect.canvas, 0, 0);
-
-            // Draw to Main Canvas on top of the original image
-            mainCtx.globalAlpha = t;
-            mainCtx.drawImage(maskedEffect.canvas, 0, 0);
-            mainCtx.globalAlpha = 1.0;
+                mainCtx.globalAlpha = t;
+                mainCtx.drawImage(effectLayer.canvas, 0, 0);
+                mainCtx.globalAlpha = 1.0;
+            }
         }
 
         // --- Helpers ---
@@ -722,5 +774,3 @@
 </body>
 
 </html>
-
-
