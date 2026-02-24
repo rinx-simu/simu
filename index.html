@@ -790,29 +790,78 @@
         const cameraModal = document.getElementById('cameraModal');
         const videoEl = document.getElementById('videoElement');
         let stream = null;
+        let currentFacingMode = 'user'; // 'user' (front) or 'environment' (back)
 
-        // Header button listener removed (button deleted)
+        // Add switch button dynamically (or we could have added to HTML, but let's just insert it here for safety to avoid matching errors)
+        if (!document.getElementById('switchCameraBtn')) {
+            const btn = document.createElement('button');
+            btn.id = 'switchCameraBtn';
+            btn.onclick = switchCamera;
+            btn.className = 'absolute top-8 left-8 text-white p-4 hover:bg-white/10 rounded-full z-20';
+            btn.title = 'Switch Camera';
+            btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>`;
+            document.getElementById('cameraModal').firstElementChild.appendChild(btn);
+        }
 
-        async function startCamera() {
+        async function startCamera(facingMode = currentFacingMode) {
+            if (stream) {
+                stream.getTracks().forEach(t => t.stop());
+            }
+
             try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+                const constraints = { video: { facingMode: facingMode } };
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
                 videoEl.srcObject = stream;
+
+                // Mirror video for front camera
+                if (facingMode === 'user') {
+                    videoEl.style.transform = 'scaleX(-1)';
+                } else {
+                    videoEl.style.transform = 'none';
+                }
+
+                currentFacingMode = facingMode;
                 cameraModal.classList.remove('hidden');
-            } catch (e) { alert("Camera Error"); }
+            } catch (e) {
+                console.error("Camera Error:", e);
+                if (facingMode === 'environment') {
+                    alert("アウトカメラへの切り替えに失敗しました。対応していない可能性があります。");
+                    startCamera('user');
+                } else {
+                    alert("カメラへのアクセス設定をご確認ください。");
+                }
+            }
+        }
+
+        function switchCamera() {
+            const newMode = currentFacingMode === 'user' ? 'environment' : 'user';
+            startCamera(newMode);
         }
 
         // Expose for Hero Button
-        window.startCameraFromHero = startCamera;
+        window.startCameraFromHero = () => startCamera('user');
 
         function closeCamera() {
-            if (stream) stream.getTracks().forEach(t => t.stop());
+            if (stream) {
+                stream.getTracks().forEach(t => t.stop());
+                stream = null;
+            }
             cameraModal.classList.add('hidden');
         }
 
         document.getElementById('shutterBtn').addEventListener('click', () => {
             const c = document.createElement('canvas');
             c.width = videoEl.videoWidth; c.height = videoEl.videoHeight;
-            c.getContext('2d').drawImage(videoEl, 0, 0);
+            const ctx = c.getContext('2d');
+
+            if (currentFacingMode === 'user') {
+                ctx.translate(c.width, 0);
+                ctx.scale(-1, 1);
+            }
+
+            ctx.drawImage(videoEl, 0, 0);
             loadImage(c.toDataURL());
             closeCamera();
         });
