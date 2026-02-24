@@ -323,11 +323,19 @@
     <script>
         // State
         let isModelLoaded = false;
-        let originalImageData = null; // ImageData object
+        let originalImageData = null;
         let landmarks = null;
         let skinColor = null;
         let noiseTexture = null;
-        let currentImgElement = null; // Store temp image for resizing logic
+        let currentImgElement = null;
+
+        // Reuseable Offscreen Buffers (Fix memory on old iPad)
+        let bufCanvas1 = document.createElement('canvas');
+        let bufCtx1 = bufCanvas1.getContext('2d');
+        let bufCanvas2 = document.createElement('canvas');
+        let bufCtx2 = bufCanvas2.getContext('2d');
+        let blurBufferCanvas = document.createElement('canvas');
+        let blurBufferCtx = blurBufferCanvas.getContext('2d');
 
         // DOM Elements
         const mainCanvas = document.getElementById('mainCanvas');
@@ -335,7 +343,6 @@
         const mainCtx = mainCanvas.getContext('2d', { willReadFrequently: true });
         const beforeCtx = beforeCanvas.getContext('2d');
 
-        const fileInput = document.getElementById('imageUpload');
         const fileInputHero = document.getElementById('imageUploadHero');
         const intensitySlider = document.getElementById('intensitySlider');
         const intensityDisplay = document.getElementById('intensityValue');
@@ -367,7 +374,6 @@
                 loadImage(URL.createObjectURL(e.target.files[0]));
             }
         };
-        // Removed header file input listener
         fileInputHero.addEventListener('change', handleFile);
 
         function loadImage(url) {
@@ -393,39 +399,28 @@
 
         async function processImage(img) {
             try {
-                // Fit Logic: Contain within the container
-                // We use the container size to determine canvas size
-                // For a side-by-side view, both canvases should match the image aspect ratio
-                // but fit within their respective containers.
-
-                // However, for FaceAPI and pixel manipulation to work easily, 
-                // we usually set canvas size to exact image size (or scaled down) 
-                // and let CSS handle the 'object-contain' display.
-                // But FaceAPI results depend on coordinate space.
-
-                // Approach:
-                // Use physical pixels for processing, CSS for display size
-                const dpr = window.devicePixelRatio || 1;
                 let w = img.width;
                 let h = img.height;
 
-                // Limit max size for performance (iPad safari memory limit)
-                const MAX_DIM = 2048;
+                // STRICT MAX SIZE (1280px for iPad 5th memory limits)
+                const MAX_DIM = 1280;
                 if (w > MAX_DIM || h > MAX_DIM) {
                     const ratio = Math.min(MAX_DIM / w, MAX_DIM / h);
                     w = Math.floor(w * ratio);
                     h = Math.floor(h * ratio);
                 }
 
-                // Setup Canvases (Physical pixels)
-                mainCanvas.width = w;
-                mainCanvas.height = h;
-                beforeCanvas.width = w;
-                beforeCanvas.height = h;
+                // Setup Canvases
+                mainCanvas.width = beforeCanvas.width = w;
+                mainCanvas.height = beforeCanvas.height = h;
 
-                // CSS will handle the actual display size (object-contain)
-                // If we were doing UI overlays on top of canvas, we'd need to set style.width/height
-                // but since it's object-contain in a flex-grow container, CSS handles it.
+                // Init Fixed Buffers
+                bufCanvas1.width = bufCanvas2.width = w;
+                bufCanvas1.height = bufCanvas2.height = h;
+
+                // Blur Buffer (1/8 size for ultra-fast bilinear blur)
+                blurBufferCanvas.width = Math.ceil(w / 8);
+                blurBufferCanvas.height = Math.ceil(h / 8);
 
                 // Draw Initial State
                 mainCtx.drawImage(img, 0, 0, w, h);
@@ -443,9 +438,8 @@
                 }
 
                 landmarks = detections[0].landmarks;
-                setupCorrectionData(); // Calculate skin color
+                setupCorrectionData();
 
-                // Reset Slider
                 updateSlider(0);
                 loadingOverlay.classList.add('hidden');
 
@@ -462,30 +456,23 @@
             window.requestAnimationFrame(() => render(val / 100));
         }
 
-        // --- Skin Color Logic (V5/V7) ---
         function setupCorrectionData() {
             if (!landmarks) return;
             const leftEye = landmarks.getLeftEye();
             const rightEye = landmarks.getRightEye();
 
-            // Scaled sampling area
             const sampleSize = Math.max(20, Math.floor(mainCanvas.width * 0.02));
-
-            // Sampling areas (Under eyes)
             const lRect = { x: Math.floor(leftEye[0].x), y: Math.floor(leftEye[5].y + 10), w: sampleSize, h: sampleSize };
             const rRect = { x: Math.floor(rightEye[3].x - sampleSize), y: Math.floor(rightEye[4].y + 10), w: sampleSize, h: sampleSize };
 
             const c1 = getAvgColor(lRect);
             const c2 = getAvgColor(rRect);
 
-            // Choose brighter/cleaner skin tone
             const luma1 = 0.299 * c1.r + 0.587 * c1.g + 0.114 * c1.b;
             const luma2 = 0.299 * c2.r + 0.587 * c2.g + 0.114 * c2.b;
             const best = (luma1 > luma2) ? c1 : c2;
 
             skinColor = `rgb(${best.r}, ${best.g}, ${best.b})`;
-
-            // Noise Texture
             noiseTexture = createNoiseTexture(mainCanvas.width, mainCanvas.height, 0.45);
         }
 
@@ -500,138 +487,106 @@
             } catch (e) { return { r: 220, g: 180, b: 160 }; }
         }
 
-        // --- Render Logic (V7.5 - Dynamic & Soft Mask) ---
+        // --- Render Logic (V8 - Ultra Light & Fast for old iPad) ---
         function render(alpha) {
             if (!originalImageData || !landmarks) return;
 
-            // 1. Reset
             mainCtx.putImageData(originalImageData, 0, 0);
             if (alpha <= 0) return;
 
             const t = alpha;
             const w = mainCanvas.width;
             const h = mainCanvas.height;
-
-            // Dynamic scaling based on resolution (Reference: 1000px)
-            const baseScale = Math.min(w, h) / 1000;
-            const blurAmt = 12 * baseScale; // More generous blur for high-res
-            const shadowBlur = 8 * baseScale;
+            const baseScale = w / 1000;
 
             const jaw = landmarks.getJawOutline();
             const nose = landmarks.getNose();
-            const leftEye = landmarks.getLeftEye();
-            const rightEye = landmarks.getRightEye();
+            const eyes = { l: landmarks.getLeftEye(), r: landmarks.getRightEye() };
             const mouth = landmarks.getMouth();
 
-            // 2. Beard Mask Surface (Soft Mask)
-            const maskSurface = createOffscreenCanvas(w, h);
-            const mCtx = maskSurface.ctx;
+            // 1. FAST BLUR (Downsampling technique - NO ctx.filter)
+            blurBufferCtx.clearRect(0, 0, blurBufferCanvas.width, blurBufferCanvas.height);
+            blurBufferCtx.drawImage(mainCanvas, 0, 0, blurBufferCanvas.width, blurBufferCanvas.height);
 
-            // Beard Mask Path
-            const beardPath = new Path2D();
-            const rCheekX = rightEye[1].x;
-            const rCheekY = rightEye[4].y + (nose[8].y - rightEye[4].y) * 0.25;
-            const lCheekX = leftEye[1].x;
-            const lCheekY = leftEye[4].y + (nose[4].y - leftEye[4].y) * 0.25;
+            // 2. Composing Effect on Buffer 1
+            bufCtx1.clearRect(0, 0, w, h);
 
-            beardPath.moveTo(jaw[0].x, jaw[0].y);
-            for (let i = 1; i <= 16; i++) beardPath.lineTo(jaw[i].x, jaw[i].y);
-            beardPath.lineTo(jaw[16].x, jaw[16].y);
-            beardPath.lineTo(rCheekX, rCheekY);
-            beardPath.lineTo(nose[8].x, nose[8].y + (8 * baseScale));
-            beardPath.lineTo(nose[6].x, nose[6].y + (2 * baseScale));
-            beardPath.lineTo(nose[4].x, nose[4].y + (8 * baseScale));
-            beardPath.lineTo(lCheekX, lCheekY);
-            beardPath.lineTo(jaw[0].x, jaw[0].y);
-            beardPath.closePath();
+            // Draw blurred skin base
+            bufCtx1.imageSmoothingEnabled = true;
+            bufCtx1.drawImage(blurBufferCanvas, 0, 0, w, h);
 
-            // Create Feathered Mask
-            mCtx.fillStyle = 'white';
-            mCtx.fill(beardPath);
-            mCtx.filter = `blur(${8 * baseScale}px)`;
-            mCtx.globalCompositeOperation = 'source-in'; // Keep edges blurred within
-            mCtx.fill(beardPath);
+            // Color overlay
+            bufCtx1.globalCompositeOperation = 'soft-light';
+            bufCtx1.fillStyle = skinColor;
+            bufCtx1.globalAlpha = 0.8 * t;
+            bufCtx1.fillRect(0, 0, w, h);
 
-            // 3. Effect Layer
-            const layer = createOffscreenCanvas(w, h);
-            const lCtx = layer.ctx;
+            bufCtx1.globalCompositeOperation = 'color';
+            bufCtx1.globalAlpha = 0.6 * t;
+            bufCtx1.fillRect(0, 0, w, h);
 
-            // Base Smoothing (Blurred version of original skin)
-            const blurLayer = createOffscreenCanvas(w, h);
-            blurLayer.ctx.filter = `blur(${blurAmt}px)`;
-            blurLayer.ctx.drawImage(mainCanvas, 0, 0);
-
-            // Compose Effect
-            lCtx.drawImage(blurLayer.canvas, 0, 0); // Skin smoothing
-
-            lCtx.globalCompositeOperation = 'soft-light';
-            lCtx.fillStyle = skinColor;
-            lCtx.globalAlpha = Math.min(1.0, t * 0.85);
-            lCtx.fillRect(0, 0, w, h); // Lift Shadows
-
-            lCtx.globalCompositeOperation = 'color';
-            lCtx.globalAlpha = Math.min(1.0, t * 0.7);
-            lCtx.fillRect(0, 0, w, h); // Color correction
-
-            if (noiseTexture) {
-                lCtx.globalCompositeOperation = 'overlay';
-                lCtx.globalAlpha = 0.1;
-                lCtx.drawImage(noiseTexture, 0, 0);
-            }
-
-            // 4. Mustache Specific (More intense correction)
+            // 3. Mustache Pass (on Buffer 2)
+            bufCtx2.clearRect(0, 0, w, h);
             const mPath = new Path2D();
             mPath.moveTo(nose[3].x, nose[3].y);
             mPath.lineTo(nose[7].x, nose[7].y);
-            mPath.lineTo(mouth[6].x + (5 * baseScale), mouth[6].y);
-            mPath.lineTo(mouth[0].x - (5 * baseScale), mouth[0].y);
+            mPath.lineTo(mouth[6].x, mouth[6].y);
+            mPath.lineTo(mouth[0].x, mouth[0].y);
             mPath.closePath();
 
-            const mustacheLayer = createOffscreenCanvas(w, h);
-            const muCtx = mustacheLayer.ctx;
-            muCtx.filter = `blur(${6 * baseScale}px)`;
-            muCtx.fillStyle = skinColor;
-            muCtx.fill(mPath);
-            muCtx.globalCompositeOperation = 'screen';
-            muCtx.globalAlpha = 0.4 * t;
-            muCtx.fill(mPath);
+            bufCtx2.fillStyle = skinColor;
+            bufCtx2.globalAlpha = 0.4 * t;
+            bufCtx2.fill(mPath);
 
-            lCtx.globalCompositeOperation = 'source-over';
-            lCtx.drawImage(mustacheLayer.canvas, 0, 0);
+            // Merge Mustache to Buffer 1 (simple source-over)
+            bufCtx1.globalCompositeOperation = 'source-over';
+            bufCtx1.globalAlpha = 1.0;
+            bufCtx1.drawImage(bufCanvas2, 0, 0);
 
-            // 5. Final Composition with Mask
-            const finalEffect = createOffscreenCanvas(w, h);
-            finalEffect.ctx.drawImage(layer.canvas, 0, 0);
-            finalEffect.ctx.globalCompositeOperation = 'destination-in';
-            finalEffect.ctx.drawImage(maskSurface.canvas, 0, 0);
+            // 4. MASKING & FINAL RENDERING
+            // Use Buffer 2 to build the alpha mask
+            bufCtx2.globalAlpha = 1.0;
+            bufCtx2.globalCompositeOperation = 'source-over';
+            bufCtx2.clearRect(0, 0, w, h);
 
-            // Post-process: Exclude sensitive areas (Lips/Nostrils)
-            const exclusion = createOffscreenCanvas(w, h);
-            const eCtx = exclusion.ctx;
+            const beardPath = new Path2D();
+            beardPath.moveTo(jaw[0].x, jaw[0].y);
+            for (let i = 1; i <= 16; i++) beardPath.lineTo(jaw[i].x, jaw[i].y);
+            beardPath.lineTo(eyes.r[1].x, nose[8].y);
+            beardPath.lineTo(nose[8].x, nose[8].y + (5 * baseScale));
+            beardPath.lineTo(nose[6].x, nose[6].y + (2 * baseScale));
+            beardPath.lineTo(nose[4].x, nose[4].y + (5 * baseScale));
+            beardPath.lineTo(eyes.l[1].x, nose[4].y);
+            beardPath.closePath();
 
-            // Lips
+            bufCtx2.fillStyle = 'white';
+            bufCtx2.fill(beardPath);
+
+            // Soft-erase lips and nostrils from mask
+            bufCtx2.globalCompositeOperation = 'destination-out';
+            const excPath = new Path2D();
             const outerLip = mouth.slice(0, 12);
-            eCtx.beginPath();
-            eCtx.moveTo(outerLip[0].x, outerLip[0].y);
-            for (let i = 1; i < outerLip.length; i++) eCtx.lineTo(outerLip[i].x, outerLip[i].y);
-            eCtx.closePath();
-            eCtx.fill();
+            if (outerLip.length > 0) {
+                excPath.moveTo(outerLip[0].x, outerLip[0].y);
+                for (let i = 1; i < outerLip.length; i++) excPath.lineTo(outerLip[i].x, outerLip[i].y);
+                excPath.closePath();
+                bufCtx2.fill(excPath); // Lips
+            }
 
-            // Nostrils
-            eCtx.beginPath();
-            eCtx.moveTo(nose[4].x, nose[4].y);
-            eCtx.lineTo(nose[6].x, nose[6].y + (5 * baseScale));
-            eCtx.lineTo(nose[8].x, nose[8].y);
-            eCtx.closePath();
-            eCtx.fill();
+            const nostrils = new Path2D();
+            nostrils.moveTo(nose[4].x, nose[4].y);
+            nostrils.lineTo(nose[6].x, nose[6].y + (4 * baseScale));
+            nostrils.lineTo(nose[8].x, nose[8].y);
+            nostrils.closePath();
+            bufCtx2.fill(nostrils); // Nostrils
 
-            finalEffect.ctx.globalCompositeOperation = 'destination-out';
-            finalEffect.ctx.filter = `blur(${4 * baseScale}px)`;
-            finalEffect.ctx.drawImage(exclusion.canvas, 0, 0);
+            // Apply mask to Buffer 1
+            bufCtx1.globalCompositeOperation = 'destination-in';
+            bufCtx1.drawImage(bufCanvas2, 0, 0);
 
-            // Render to Main Canvas
+            // Final Draw
             mainCtx.globalAlpha = t;
-            mainCtx.drawImage(finalEffect.canvas, 0, 0);
+            mainCtx.drawImage(bufCanvas1, 0, 0);
             mainCtx.globalAlpha = 1.0;
         }
 
@@ -639,12 +594,6 @@
         intensitySlider.addEventListener('input', (e) => updateSlider(e.target.value));
 
         function resetApp() { window.location.reload(); }
-
-        function createOffscreenCanvas(w, h) {
-            const c = document.createElement('canvas');
-            c.width = w; c.height = h;
-            return { canvas: c, ctx: c.getContext('2d') };
-        }
 
         function createNoiseTexture(w, h, amount) {
             const c = document.createElement('canvas');
@@ -665,8 +614,6 @@
         const videoEl = document.getElementById('videoElement');
         let stream = null;
 
-        // Header button listener removed (button deleted)
-
         async function startCamera() {
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
@@ -675,7 +622,6 @@
             } catch (e) { alert("Camera Error"); }
         }
 
-        // Expose for Hero Button
         window.startCameraFromHero = startCamera;
 
         function closeCamera() {
