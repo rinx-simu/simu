@@ -15,7 +15,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@400;700&display=swap"
         rel="stylesheet">
 
     <script>
@@ -35,6 +35,7 @@
                     fontFamily: {
                         sans: ['"Noto Sans JP"', 'sans-serif'],
                         serif: ['"Cinzel"', 'serif'],
+                        mincho: ['"Noto Serif JP"', 'serif'],
                     }
                 }
             }
@@ -58,12 +59,14 @@
         /* Custom Range Input (Clean Light Theme) */
         input[type=range] {
             -webkit-appearance: none;
+            appearance: none;
             width: 100%;
             background: transparent;
         }
 
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none;
+            appearance: none;
             height: 28px;
             width: 28px;
             border-radius: 50%;
@@ -155,8 +158,8 @@
     <header
         class="w-full h-16 px-8 flex justify-center items-center bg-white border-b border-gray-100 z-50 shrink-0 relative">
         <div class="flex items-center gap-3">
-            <div class="w-6 h-6 bg-[#c5a059] transform rotate-45"></div>
-            <h1 class="font-serif text-xl tracking-widest text-[#222222] font-bold">RINX <span
+            <img src="./logo.png" alt="Logo" class="h-8 w-auto object-contain">
+            <h1 class="font-mincho text-xl tracking-widest text-[#222222] font-bold">RINX <span
                     class="text-xs font-normal tracking-wider ml-2 text-gray-500">VIRTUAL REMOVAL SIMULATOR</span></h1>
         </div>
     </header>
@@ -614,39 +617,73 @@
             const h = mainCanvas.height;
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
 
-            // Calculate center of face (approximate)
-            const noseTip = nose[4];
+            // Calculate center of face (approximate) - 鼻先（nose[3]）を正しい基準点に使用
+            const noseTip = nose[3];
 
             // Create solid filled mask for the beard area
             const beardMask = createOffscreenCanvas(w, h);
 
-            // Generate expanded beard shape (pushing chin OUTWARDS)
+            // 輪郭からのはみ出しを防ぎつつ、あご先（6〜10）だけ外側に拡張して黒残りを防ぐ
             const beardShape = [];
-            // We expand the jaw points (0-16) outwards from the nose so the mask covers under the chin
-            const expandBase = 0.08;
-
             for (let i = 0; i <= 16; i++) {
                 const p = jaw[i];
-                const dx = p.x - noseTip.x;
-                const dy = p.y - noseTip.y;
-                // Add extra expansion specifically to the bottom chin points (pixels 6 to 10)
-                let extraChin = 0;
-                if (i >= 6 && i <= 10) extraChin = 0.05;
-
-                const totalExpand = expandBase + extraChin;
-                beardShape.push({ x: p.x + dx * totalExpand, y: p.y + dy * totalExpand });
+                if (i >= 6 && i <= 10) {
+                    const dx = p.x - noseTip.x;
+                    const dy = p.y - noseTip.y;
+                    // アゴの底面だけ0.06（6%）外側に広げる
+                    beardShape.push({ x: p.x + dx * 0.06, y: p.y + dy * 0.06 });
+                } else {
+                    beardShape.push({ x: p.x, y: p.y });
+                }
             }
 
-            // Connect up to cheekbones and across nose
-            beardShape.push({ x: rightEye[1].x, y: rightEye[4].y + (nose[8].y - rightEye[4].y) * 0.25 });
-            beardShape.push({ x: nose[8].x, y: nose[8].y + 8 });
+            // 頬上部（目の下付近）の境界を馴染ませるため、ベースマスクと頬上部マスクを分けて作成する
+            // 1. ベースのマスク（アゴ〜口周り・頬下部）
+            beardShape.push({ x: jaw[16].x, y: nose[8].y }); 
+            beardShape.push({ x: nose[8].x, y: nose[8].y + 5 });
+            
+            // 鼻下
             beardShape.push({ x: nose[6].x, y: nose[6].y + 2 });
-            beardShape.push({ x: nose[4].x, y: nose[4].y + 8 });
-            beardShape.push({ x: leftEye[1].x, y: leftEye[4].y + (nose[4].y - leftEye[4].y) * 0.25 });
+            beardShape.push({ x: nose[4].x, y: nose[4].y + 5 });
+            
+            // 画像左側の頬・アゴへ
+            beardShape.push({ x: jaw[0].x, y: nose[4].y });
 
             createMaskPath(beardMask.ctx, w, h, beardShape);
             beardMask.ctx.fillStyle = 'rgba(255, 255, 255, 1)';
             beardMask.ctx.fill();
+
+            // 2. 頬上部（目の下付近）専用のマスクを作成し、強くぼかして重ねることでグラデーション状に馴染ませる
+            // 左右のランドマークのねじれ（Criss-Cross）を完全に修正し、完全に対称なマスクを生成
+            const cheekMask = createOffscreenCanvas(w, h);
+            
+            // 【画面左側】の頬（jaw[0], rightEye, nose[4] を使用）
+            const leftCheek = [
+                { x: nose[4].x, y: nose[4].y - 5 },
+                { x: rightEye[3].x, y: Math.max(rightEye[4].y, rightEye[5].y) + 30 }, // 涙袋に入らないよう +18 から +30 に下げる
+                { x: jaw[0].x, y: Math.max(rightEye[4].y, rightEye[5].y) + 30 }, // 眼の下の高さで顔の輪郭へ
+                { x: jaw[0].x, y: nose[4].y }
+            ];
+            createMaskPath(cheekMask.ctx, w, h, leftCheek);
+            cheekMask.ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+            cheekMask.ctx.fill();
+            
+            // 【画面右側】の頬（jaw[16], leftEye, nose[8] を使用）
+            const rightCheek = [
+                { x: jaw[16].x, y: nose[8].y },
+                { x: jaw[16].x, y: Math.max(leftEye[4].y, leftEye[5].y) + 30 }, // 眼の下の高さで顔の輪郭へ
+                { x: leftEye[0].x, y: Math.max(leftEye[4].y, leftEye[5].y) + 30 }, // 涙袋に入らないよう +18 から +30 に下げる
+                { x: nose[8].x, y: nose[8].y - 5 } 
+            ];
+            createMaskPath(cheekMask.ctx, w, h, rightCheek);
+            cheekMask.ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+            cheekMask.ctx.fill();
+
+            // 頬上部だけ強いぼかし（半径30）を適用し、メインマスクに合成
+            const blurredCheeks = createOffscreenCanvas(w, h);
+            applySafeBlur(blurredCheeks.ctx, cheekMask.canvas, 30);
+            
+            beardMask.ctx.drawImage(blurredCheeks.canvas, 0, 0);
 
             // Clear out lips and nose from the mask
             beardMask.ctx.globalCompositeOperation = 'destination-out';
@@ -655,9 +692,16 @@
             beardMask.ctx.fillStyle = 'rgba(0,0,0,1)';
             beardMask.ctx.fill();
 
-            // Expand the lip mask outward to protect the lip line from being blurred into the skin
-            // We use a thick stroke to create a safe buffer zone around the lips
-            beardMask.ctx.lineWidth = 18;
+            // 鼻下側（上唇）はキワまで補正を効かせるため保護ストロークを描かない。
+            // 下唇と口角（mouthの6〜11、および0）にのみ保護ストロークを追加し、肌と同化するのを防ぐ。
+            beardMask.ctx.beginPath();
+            beardMask.ctx.moveTo(mouth[6].x, mouth[6].y);
+            for (let i = 7; i < 12; i++) {
+                beardMask.ctx.lineTo(mouth[i].x, mouth[i].y);
+            }
+            beardMask.ctx.lineTo(mouth[0].x, mouth[0].y); // 口の左端まで
+            
+            beardMask.ctx.lineWidth = 30; // 唇が小さく見えないよう、18から30に拡大して横・下を広く保護
             beardMask.ctx.lineJoin = 'round';
             beardMask.ctx.strokeStyle = 'rgba(0,0,0,1)';
             beardMask.ctx.stroke();
@@ -670,9 +714,9 @@
 
             beardMask.ctx.globalCompositeOperation = 'source-over';
 
-            // Blur the hard edges of this mask strongly
+            // Blur the hard edges of this mask strongly (Set to 10 for smooth blending without excessive bleeding)
             const finalMask = createOffscreenCanvas(w, h);
-            applySafeBlur(finalMask.ctx, beardMask.canvas, 18);
+            applySafeBlur(finalMask.ctx, beardMask.canvas, 10);
 
             // ==========================================
             // Heavy Beard Removal Effect Logic
@@ -682,7 +726,7 @@
             // Step 1: "Melt" the dense hair. 
             const heavyBlurLayer = createOffscreenCanvas(w, h);
             heavyBlurLayer.ctx.drawImage(mainCanvas, 0, 0);
-            applySafeBlur(heavyBlurLayer.ctx, heavyBlurLayer.canvas, 15);
+            applySafeBlur(heavyBlurLayer.ctx, heavyBlurLayer.canvas, 10);
 
             // Apply this blurred base to our effect layer
             effectLayer.ctx.drawImage(heavyBlurLayer.canvas, 0, 0);
@@ -691,40 +735,66 @@
             // We create a very soft, blurry white patch over the mustache to screen the shadows up
             const mustacheArea = createOffscreenCanvas(w, h);
             const mPath = [
-                { x: nose[4].x - 12, y: nose[4].y },
-                { x: nose[8].x + 12, y: nose[8].y },
-                { x: mouth[6].x + 8, y: mouth[6].y },
-                { x: mouth[0].x - 8, y: mouth[0].y }
+                { x: nose[4].x - 15, y: nose[4].y },
+                { x: nose[8].x + 15, y: nose[8].y },
+                { x: mouth[6].x + 15, y: mouth[6].y + 25 }, // 下唇ラインまで大幅に拡張して上唇のキワのアルファ減衰を防ぐ
+                { x: mouth[0].x - 15, y: mouth[0].y + 25 }
             ];
             createMaskPath(mustacheArea.ctx, w, h, mPath);
             mustacheArea.ctx.fillStyle = skinColor;
             mustacheArea.ctx.fill();
 
-            // Blur it extremely heavily so it's just a soft cloud of light
+            // Blur it heavily so it's just a soft cloud of light
             const softMustache = createOffscreenCanvas(w, h);
-            applySafeBlur(softMustache.ctx, mustacheArea.canvas, 20);
+            applySafeBlur(softMustache.ctx, mustacheArea.canvas, 15);
 
-            // Apply the soft mustache lift
-            // Boosted lift further to combat strong blue shadow
+            // Apply the soft mustache lift (スクリーンで明るく飛ばす)
             effectLayer.ctx.globalCompositeOperation = 'screen';
+            // 鼻下の黒残りを消すため0.80 -> 0.95に強化
+            effectLayer.ctx.globalAlpha = Math.min(0.95, t * 0.95);
+            effectLayer.ctx.drawImage(softMustache.canvas, 0, 0);
+
+            // 追加: 仮想コンシーラー（青みを打ち消すオレンジ/ピーチ色）
+            const concealerLayer = createOffscreenCanvas(w, h);
+            concealerLayer.ctx.fillStyle = 'rgba(255, 150, 110, 1)'; // 青ヒゲを打ち消す暖色系
+            concealerLayer.ctx.fillRect(0, 0, w, h);
+            concealerLayer.ctx.globalCompositeOperation = 'destination-in';
+            concealerLayer.ctx.drawImage(softMustache.canvas, 0, 0);
+
+            // コンシーラーレイヤーをColor合成して根元の青グスミを解消する
+            // べた塗り感を減らすため0.70 -> 0.40に低減
+            effectLayer.ctx.globalCompositeOperation = 'color';
+            effectLayer.ctx.globalAlpha = Math.min(0.40, t * 0.40);
+            effectLayer.ctx.drawImage(concealerLayer.canvas, 0, 0);
+
+            // 鼻下を物理的に厚塗りしてさらにカバーを強固にする
+            effectLayer.ctx.globalCompositeOperation = 'normal';
+            // 人中の陰影を残すため、限界の1.0から0.60へ大幅にトーンダウン
             effectLayer.ctx.globalAlpha = Math.min(0.60, t * 0.60);
             effectLayer.ctx.drawImage(softMustache.canvas, 0, 0);
 
-            // Step 3: Global Shadow Lift
+            // Step 3: Global Shadow Lift (Reduced brightness to prevent bleeding)
             effectLayer.ctx.globalCompositeOperation = 'screen';
             effectLayer.ctx.fillStyle = skinColor;
-            effectLayer.ctx.globalAlpha = Math.min(0.15, t * 0.15);
+            effectLayer.ctx.globalAlpha = Math.min(0.10, t * 0.10);
+            effectLayer.ctx.fillRect(0, 0, w, h);
+
+            // Step 3.5: Physical Skin Fill (塗りつぶし処理の強化)
+            // Directly paint the skin color to cover hairs without brightening excessive areas
+            effectLayer.ctx.globalCompositeOperation = 'normal';
+            effectLayer.ctx.fillStyle = skinColor;
+            effectLayer.ctx.globalAlpha = Math.min(0.35, t * 0.35);
             effectLayer.ctx.fillRect(0, 0, w, h);
 
             // Step 4: Recolor to match the face skin.
             effectLayer.ctx.globalCompositeOperation = 'soft-light';
             effectLayer.ctx.fillStyle = skinColor;
-            effectLayer.ctx.globalAlpha = Math.min(0.75, t * 0.75);
+            effectLayer.ctx.globalAlpha = Math.min(0.50, t * 0.50);
             effectLayer.ctx.fillRect(0, 0, w, h);
 
             effectLayer.ctx.globalCompositeOperation = 'color';
-            // Increase Color overlay to 85% for stronger physical paint coverage
-            effectLayer.ctx.globalAlpha = Math.min(0.85, t * 0.85);
+            // Strong color override
+            effectLayer.ctx.globalAlpha = Math.min(0.90, t * 0.90);
             effectLayer.ctx.fillRect(0, 0, w, h);
 
             // Step 5: Add artificial skin noise
@@ -878,3 +948,4 @@
 </body>
 
 </html>
+
