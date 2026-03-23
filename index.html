@@ -1,36 +1,24 @@
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>RINX VIRTUAL REMOVAL SIMULATOR</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>RINX BODY HAIR REMOVAL SIMULATOR</title>
 
     <!-- Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@400;700&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@400;700&display=swap" rel="stylesheet">
 
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        rinx: {
-                            gold: '#c5a059',
-                            dark: '#111111',
-                            gray: '#333333',
-                            light: '#f9f9f9',
-                            white: '#ffffff',
-                            text: '#222222'
-                        }
+                        rinx: { gold: '#c5a059', dark: '#111111', text: '#222222' }
                     },
                     fontFamily: {
                         sans: ['"Noto Sans JP"', 'sans-serif'],
@@ -41,911 +29,1058 @@
             }
         }
     </script>
-
     <style>
-        body {
-            background-color: #ffffff;
-            color: #222222;
-            overflow: hidden;
-            /* Lock scroll for iPad app-feel */
-        }
-
-        .gold-line {
-            height: 2px;
-            background: linear-gradient(90deg, transparent 0%, #c5a059 50%, transparent 100%);
-            width: 100%;
-        }
-
-        /* Custom Range Input (Clean Light Theme) */
-        input[type=range] {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 100%;
-            background: transparent;
-        }
-
+        body { background-color: #f9f9f9; color: #222222; overflow: hidden; touch-action: none; }
+        
+        input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; background: transparent; }
         input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            height: 28px;
-            width: 28px;
-            border-radius: 50%;
-            background: #ffffff;
-            cursor: pointer;
-            margin-top: -12px;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-            border: 2px solid #c5a059;
+            -webkit-appearance: none; height: 28px; width: 28px; border-radius: 50%;
+            background: #ffffff; cursor: pointer; margin-top: -12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2); border: 2px solid #c5a059;
         }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: #e0e0e0; border-radius: 2px; }
 
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 4px;
-            cursor: pointer;
-            background: #e0e0e0;
-            border-radius: 2px;
+        .btn-gold { background: #c5a059; color: white; transition: all 0.3s ease; }
+        .btn-gold:hover { background: #b08d4b; box-shadow: 0 4px 12px rgba(197, 160, 89, 0.3); }
+
+        .tool-btn { 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            width: 64px; height: 64px; border-radius: 12px; background: white;
+            color: #666; border: 2px solid transparent; transition: all 0.2s;
         }
-
-        .loader {
-            width: 48px;
-            height: 48px;
-            border: 3px solid #c5a059;
-            border-radius: 50%;
-            display: inline-block;
-            position: relative;
-            box-sizing: border-box;
-            animation: rotation 1s linear infinite;
-        }
-
-        .loader::after {
-            content: '';
-            box-sizing: border-box;
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            border: 3px solid transparent;
-            border-bottom-color: #c5a059;
-        }
-
-        @keyframes rotation {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-
-        .btn-gold {
-            background: #c5a059;
-            color: white;
-            transition: all 0.3s ease;
-        }
-
-        .btn-gold:hover {
-            background: #b08d4b;
-            box-shadow: 0 4px 12px rgba(197, 160, 89, 0.3);
-        }
-
-        .btn-outline {
-            border: 1px solid #c5a059;
-            color: #c5a059;
-            background: transparent;
-            transition: all 0.3s ease;
-        }
-
-        .btn-outline:hover {
-            background: rgba(197, 160, 89, 0.1);
-        }
-
-        /* iPad landscape optimization */
-        .canvas-container {
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-            border-radius: 4px;
-            overflow: hidden;
-            background: #f0f0f0;
-        }
+        .tool-btn.active { border-color: #c5a059; color: #c5a059; background: #fdfaf3; }
+        
+        .canvas-container { position: relative; width: 100%; height: 100%; overflow: hidden; background: #eee; }
+        canvas { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+        
+        /* Cursor styling based on tool */
+        .cursor-brush { cursor: crosshair; }
+        .cursor-lasso { cursor: crosshair; }
+        .cursor-eraser { cursor: cell; }
     </style>
 </head>
-
-<body class="h-screen w-screen flex flex-col bg-white">
+<body class="h-screen w-screen flex flex-col">
 
     <!-- Header -->
-    <header
-        class="w-full h-16 px-8 flex justify-center items-center bg-white border-b border-gray-100 z-50 shrink-0 relative">
-        <div class="flex items-center gap-3">
-            <h1 class="font-mincho text-xl tracking-widest text-[#222222] font-bold">RINX <span
-                    class="text-xs font-normal tracking-wider ml-2 text-gray-500">VIRTUAL REMOVAL SIMULATOR</span></h1>
+    <header class="w-full h-14 px-6 flex justify-between items-center bg-white border-b border-gray-200 z-50 shrink-0">
+        <h1 class="font-mincho text-lg text-rinx-text font-bold">RINX <span class="text-[10px] font-normal tracking-wider ml-1 text-gray-500">BODY SIMULATOR</span></h1>
+        <div class="flex gap-2">
+            <button onclick="downloadImage()" class="p-2 text-gray-600 hover:text-rinx-gold rounded-full"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg></button>
+            <button onclick="resetApp()" class="p-2 text-gray-400 hover:text-red-500 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
     </header>
 
-    <!-- Main Content Area -->
-    <main class="flex-grow flex items-stretch p-6 gap-6 overflow-hidden relative">
-
-        <!-- Initial State / Placeholder -->
-        <div id="heroPlaceholder"
-            class="absolute inset-0 z-10 bg-white flex flex-col items-center justify-center p-8 transition-opacity duration-300">
-            <div class="max-w-2xl text-center space-y-6">
-                <h2 class="font-serif text-5xl text-[#c5a059] mb-4">The Future You</h2>
-                <p class="text-gray-500 leading-relaxed">
-                    写真を選択または撮影して、ヒゲのない理想の姿をシミュレーション。<br>
-                    AIが肌の質感を学習し、自然な仕上がりを実現します。
-                </p>
-                <div class="h-px w-24 bg-[#c5a059] mx-auto opacity-50"></div>
-                <div class="flex justify-center gap-6 pt-6">
-                    <!-- Photo Button -->
-                    <label
-                        class="btn-gold px-12 py-4 rounded-sm text-lg shadow-lg cursor-pointer transform hover:-translate-y-1 transition-transform flex items-center justify-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
-                            stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        SELECT PHOTO
-                        <input type="file" id="imageUploadHero" accept="image/*" class="hidden">
-                    </label>
-
-                    <!-- Camera Button -->
-                    <button onclick="startCameraFromHero()"
-                        class="btn-outline px-12 py-4 rounded-sm text-lg shadow-lg cursor-pointer transform hover:-translate-y-1 transition-transform flex items-center justify-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
-                            stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        </svg>
-                        CAMERA
-                    </button>
-                </div>
+    <!-- Main Content Series -->
+    <main class="flex-grow flex relative overflow-hidden">
+        
+        <!-- Hero Initial (Upload) -->
+        <div id="hero" class="absolute inset-0 z-40 bg-white flex flex-col items-center justify-center p-8 transition-opacity duration-300">
+            <div class="text-center space-y-6">
+                <h2 class="font-serif text-4xl text-rinx-gold mb-2">Body Hair Removal</h2>
+                <p class="text-gray-500 text-sm">なぞるだけで、ボディのムダ毛をシミュレーション。</p>
+                <label class="btn-gold px-10 py-4 rounded-sm text-lg shadow-lg cursor-pointer flex items-center justify-center gap-2 mx-auto w-max mt-8">
+                    SELECT PHOTO
+                    <input type="file" id="imageUpload" accept="image/*" class="hidden">
+                </label>
             </div>
         </div>
 
-        <!-- 2-Column Grid for Before / After -->
-        <div id="simulatorView"
-            class="w-full h-full relative opacity-0 pointer-events-none transition-opacity duration-500">
+        <!-- Toolbar (Left) -->
+        <div id="toolbar" class="hidden w-24 bg-white border-r border-gray-200 flex-col items-center py-6 gap-6 z-30 shadow-none overflow-y-auto shrink-0 relative">
+            
+            <button class="tool-btn active group" data-tool="ai_lasso" onclick="setTool('ai_lasso')">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1 text-rinx-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                <span class="text-[10px] font-bold">AI選択</span>
+            </button>
 
-            <div class="absolute inset-0 grid grid-cols-2 gap-6 pb-24">
-                <!-- LEFT: BEFORE -->
-                <div class="flex flex-col h-full overflow-hidden">
-                    <div class="flex justify-between items-end mb-2 px-2 h-8 shrink-0">
-                        <span class="font-serif text-sm tracking-widest text-[#c5a059] font-bold">BEFORE</span>
-                    </div>
-                    <!-- Canvas Container -->
-                    <div class="flex-grow canvas-container relative bg-gray-100 w-full h-full">
-                        <canvas id="beforeCanvas" class="w-full h-full object-contain absolute inset-0"></canvas>
-                    </div>
-                </div>
+            <!-- Line Separator -->
+            <div class="w-12 h-px bg-gray-200 my-1"></div>
 
-                <!-- RIGHT: AFTER -->
-                <div class="flex flex-col h-full overflow-hidden relative">
-                    <div class="flex justify-between items-end mb-2 px-2 h-8 shrink-0">
-                        <span class="font-serif text-sm tracking-widest text-[#c5a059] font-bold">AFTER</span>
-                        <!-- Download & Reset Buttons moved to header or overlay? Keeping here for now but absolute -->
-                        <div class="flex gap-2">
-                            <button id="downloadBtn"
-                                class="bg-white hover:bg-gray-50 text-gray-800 p-1.5 rounded-full shadow-sm transition-all"
-                                title="Save">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-                                    stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                </svg>
-                            </button>
-                            <button onclick="resetApp()"
-                                class="bg-white hover:bg-gray-50 text-gray-400 hover:text-red-500 p-1.5 rounded-full shadow-sm transition-all"
-                                title="Reset">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-                                    stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Canvas Container -->
-                    <div class="flex-grow canvas-container relative bg-gray-100 w-full h-full">
-                        <canvas id="mainCanvas" class="w-full h-full object-contain absolute inset-0"></canvas>
-
-                        <!-- Loading Indicator -->
-                        <div id="loadingOverlay"
-                            class="absolute inset-0 bg-white/80 flex flex-col items-center justify-center z-20 hidden">
-                            <span class="loader mb-4"></span>
-                            <p class="text-[#c5a059] tracking-widest text-xs font-bold">PROCESSING...</p>
-                        </div>
-                    </div>
+            <button class="tool-btn" data-tool="smart" onclick="setTool('smart')">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-dasharray="2 2"/></svg>
+                <span class="text-[10px] font-bold">ブラシ</span>
+            </button>
+            <!-- Size Slider moved under Brush -->
+            <div id="brushSliderContainer" class="flex flex-col items-center w-full px-1 -mt-4 mb-2 hidden">
+                <span class="text-[8px] text-gray-400 font-bold mb-1">サイズ</span>
+                <div class="flex items-center justify-between w-full gap-1">
+                    <span class="text-[12px] text-gray-400 font-bold leading-none">-</span>
+                    <input type="range" id="brushSizeSlider" min="10" max="100" value="20" class="w-full flex-grow mx-1" style="height:2px;">
+                    <span class="text-[12px] text-gray-400 font-bold leading-none">+</span>
                 </div>
             </div>
 
-            <!-- Central Bottom Slider -->
-            <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-full max-w-xl z-20 px-6">
-                <div
-                    class="bg-white/90 backdrop-blur shadow-2xl rounded-full px-8 py-4 border border-gray-100 flex items-center gap-4">
+            <button class="tool-btn" data-tool="lasso" onclick="setTool('lasso')">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                <span class="text-[10px] font-bold">囲む</span>
+            </button>
+            <button class="tool-btn" data-tool="eraser" onclick="setTool('eraser')">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M2.5 15.5l9-9a2 2 0 012.8 0L20.5 12a2 2 0 010 2.8l-9 9a2 2 0 01-2.8 0L2.5 18a2 2 0 010-2.8z M15 15l4.5 4.5 M22 22H11"/>
+                </svg>
+                <span class="text-[10px] font-bold">消す</span>
+            </button>
+            <div id="eraserSliderContainer" class="flex flex-col items-center w-full px-1 -mt-4 mb-2 hidden">
+                <span class="text-[8px] text-gray-400 font-bold mb-1">サイズ</span>
+                <div class="flex items-center justify-between w-full gap-1">
+                    <span class="text-[12px] text-gray-400 font-bold leading-none">-</span>
+                    <input type="range" id="eraserSizeSlider" min="10" max="100" value="20" class="w-full flex-grow mx-1" style="height:2px;">
+                    <span class="text-[12px] text-gray-400 font-bold leading-none">+</span>
+                </div>
+            </div>
+
+            <!-- Line Separator -->
+            <div class="w-12 h-px bg-gray-200 my-2"></div>
+
+            <button class="tool-btn" onclick="undoState()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1 text-gray-500 hover:text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+                <span class="text-[10px] font-bold text-gray-500">戻る</span>
+            </button>
+            
+            <button class="mt-auto px-2 py-4 text-xs font-bold text-red-400 hover:text-red-600" onclick="clearMask()">クリア</button>
+        </div>
+
+        <!-- Canvas Area -->
+        <div id="workspace" class="hidden flex-grow relative canvas-container cursor-brush">
+            <!-- Layers -->
+            <canvas id="baseCanvas"></canvas> <!-- Original Image -->
+            <canvas id="effectCanvas"></canvas> <!-- Rendered Hair Removal -->
+            <canvas id="maskCanvas" class="opacity-50 pointer-events-none mix-blend-overlay"></canvas> <!-- Visual Yellow Highlight -->
+            <canvas id="interactionCanvas" class="absolute inset-0 z-10"></canvas> <!-- Top layer for events and UI drawing -->
+
+            <!-- Compare Button -->
+            <button id="compareBtn" class="absolute top-4 right-4 bg-white/90 backdrop-blur shadow-lg border border-gray-200 px-6 py-3 rounded-full text-sm font-bold text-gray-700 z-20 active:bg-gray-100 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                比較する
+            </button>
+
+            <!-- Active Simulation Feedback -->
+            <div id="activeFeedback" class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-rinx-gold/90 text-white px-6 py-2 rounded-full text-sm font-bold shadow-lg z-20 transition-opacity duration-300 opacity-0 pointer-events-none flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                シミュレーション適用中
+            </div>
+
+            <!-- Loading Overlay -->
+            <div id="loading" class="absolute inset-0 bg-white/80 z-50 flex flex-col items-center justify-center hidden">
+                <div class="w-10 h-10 border-4 border-rinx-gold border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Bottom Intensity Slider Area -->
+    <div id="footerControls" class="hidden w-full bg-white border-t border-gray-200 shrink-0 relative z-30">
+        <div class="flex w-full h-full">
+            <div class="w-24 shrink-0 hidden md:block"></div> <!-- Matches Toolbar width -->
+            <div class="flex-grow py-4 px-8">
+                <div class="max-w-3xl mx-auto flex items-center gap-4">
                     <span class="font-sans text-xs font-bold text-gray-400">0%</span>
                     <input type="range" id="intensitySlider" min="0" max="100" value="0" class="flex-grow">
                     <span class="font-sans text-xs font-bold text-gray-400">100%</span>
-                    <div class="w-px h-8 bg-gray-200 mx-2"></div>
-                    <span id="intensityValue"
-                        class="font-serif text-lg font-bold text-[#c5a059] w-12 text-center">0%</span>
                 </div>
             </div>
-        </div>
-    </main>
-
-    <!-- Footer -->
-    <footer class="w-full py-2 text-center bg-white border-t border-gray-100 shrink-0 z-40 relative">
-        <p class="text-[10px] text-gray-400 font-sans tracking-wider">Copyright© RINX Co.Ltd., All Rights Reserved.</p>
-    </footer>
-
-    <!-- Camera Modal -->
-    <div id="cameraModal" class="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center hidden">
-        <div class="relative h-full w-full max-w-4xl flex items-center justify-center bg-black">
-            <video id="videoElement" class="h-full w-full object-cover opacity-80" autoplay playsinline></video>
-
-            <!-- GUIDELINE OVERLAY -->
-            <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
-                <!-- Oval Face Guide SVG -->
-                <svg viewBox="0 0 100 100" class="h-[70%] w-auto opacity-60 drop-shadow-lg">
-                    <!-- Face Oval -->
-                    <ellipse cx="50" cy="50" rx="30" ry="40" fill="none" stroke="white" stroke-width="0.8"
-                        stroke-dasharray="2 2" />
-
-                    <!-- Center Line -->
-                    <line x1="50" y1="10" x2="50" y2="20" stroke="white" stroke-width="0.5" />
-                    <line x1="50" y1="80" x2="50" y2="90" stroke="white" stroke-width="0.5" />
-
-                    <!-- Eye Level Guide -->
-                    <line x1="30" y1="42" x2="70" y2="42" stroke="white" stroke-width="0.3" stroke-dasharray="1 1" />
-                </svg>
-                <div
-                    class="absolute bottom-32 bg-black/50 px-6 py-2 rounded-full border border-white/20 backdrop-blur-sm">
-                    <p class="text-white text-sm tracking-widest font-bold">枠内に顔を入れてください</p>
-                </div>
-            </div>
-
-            <button onclick="closeCamera()"
-                class="absolute top-8 right-8 text-white p-4 hover:bg-white/10 rounded-full z-20">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
-                    stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-
-            <button id="shutterBtn"
-                class="absolute bottom-12 w-20 h-20 rounded-full border-4 border-white bg-transparent flex items-center justify-center hover:bg-white/20 transition-all z-20">
-                <div class="w-16 h-16 bg-white rounded-full"></div>
-            </button>
         </div>
     </div>
 
+<script>
+    // System State
+    const s = {
+        tool: 'ai_lasso', // ai_lasso, smart, eraser
+        brushSize: 20,
+        eraserSize: 20,
+        intensity: 0,
+        drawing: false,
+        imgWidth: 0, imgHeight: 0,
+        scale: 1, offsetX: 0, offsetY: 0,
+        startColor: null,
+        lassoPoints: [],
+        undoStack: [],
+        baseSkinColor: {r: 220, g:180, b:160} // Fallback
+    };
 
-    <script>
-        // State
-        let isModelLoaded = false;
-        let originalImageData = null; // ImageData object
-        let landmarks = null;
-        let skinColor = null;
-        let noiseTexture = null;
-        let currentImgElement = null; // Store temp image for resizing logic
+    // DOM Elements
+    const hero = document.getElementById('hero');
+    const toolbar = document.getElementById('toolbar');
+    const workspace = document.getElementById('workspace');
+    const footerControls = document.getElementById('footerControls');
+    const fileInput = document.getElementById('imageUpload');
+    
+    // Canvases
+    const baseCanvas = document.getElementById('baseCanvas');
+    const effectCanvas = document.getElementById('effectCanvas');
+    const maskCanvas = document.getElementById('maskCanvas');
+    const interactionCanvas = document.getElementById('interactionCanvas');
+    const baseCtx = baseCanvas.getContext('2d', {willReadFrequently: true});
+    const effectCtx = effectCanvas.getContext('2d');
+    const maskCtx = maskCanvas.getContext('2d', {willReadFrequently: true});
+    const interCtx = interactionCanvas.getContext('2d');
 
-        // DOM Elements
-        const mainCanvas = document.getElementById('mainCanvas');
-        const beforeCanvas = document.getElementById('beforeCanvas');
-        const mainCtx = mainCanvas.getContext('2d', { willReadFrequently: true });
-        const beforeCtx = beforeCanvas.getContext('2d');
+    // Hidden Backbuffers (High Res)
+    const blurBuffer = document.createElement('canvas').getContext('2d');
+    const logicalMaskBuffer = document.createElement('canvas').getContext('2d', {willReadFrequently: true}); // The actual 0-255 mask
 
-        const fileInput = document.getElementById('imageUpload');
-        const fileInputHero = document.getElementById('imageUploadHero');
-        const intensitySlider = document.getElementById('intensitySlider');
-        const intensityDisplay = document.getElementById('intensityValue');
+    // Binds
+    document.getElementById('brushSizeSlider').oninput = (e) => { s.brushSize = parseInt(e.target.value); };
+    document.getElementById('eraserSizeSlider').oninput = (e) => { s.eraserSize = parseInt(e.target.value); };
+    document.getElementById('intensitySlider').oninput = (e) => { setIntensity(e.target.value); };
+    fileInput.onchange = (e) => { if(e.target.files[0]) loadImage(e.target.files[0]); };
 
-        const heroPlaceholder = document.getElementById('heroPlaceholder');
-        const simulatorView = document.getElementById('simulatorView');
-        const loadingOverlay = document.getElementById('loadingOverlay');
+    // --- State Management ---
+    function saveState() {
+        if(!s.imgWidth) return;
+        const imgData = logicalMaskBuffer.getImageData(0, 0, s.imgWidth, s.imgHeight);
+        s.undoStack.push(imgData);
+        if(s.undoStack.length > 20) s.undoStack.shift(); // Keep last 20 steps
+    }
 
-        // --- Init ---
-        async function init() {
-            try {
-                const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
-                await Promise.all([
-                    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-                    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL)
-                ]);
-                isModelLoaded = true;
-                console.log("Models Loaded");
-            } catch (e) {
-                console.error(e);
-                alert("AIモデルの読み込みに失敗しました。リロードしてください。");
-            }
-        }
-        init();
+    function undoState() {
+        if(s.undoStack.length === 0) return;
+        const previousState = s.undoStack.pop();
+        logicalMaskBuffer.putImageData(previousState, 0, 0);
+        drawVisualMask();
+        renderEffect();
+    }
 
-        // --- Logic ---
-        const handleFile = (e) => {
-            if (e.target.files && e.target.files[0]) {
-                loadImage(URL.createObjectURL(e.target.files[0]));
-            }
-        };
-        // Removed header file input listener
-        fileInputHero.addEventListener('change', handleFile);
-
-        function loadImage(url) {
-            if (!isModelLoaded) return alert("準備中です");
-
-            heroPlaceholder.style.opacity = '0';
-            setTimeout(() => {
-                heroPlaceholder.classList.add('hidden');
-                simulatorView.classList.remove('pointer-events-none');
-                simulatorView.classList.remove('opacity-0');
-            }, 300);
-
-            loadingOverlay.classList.remove('hidden');
-
+    // --- Core Operations ---
+    async function loadImage(file) {
+        setLoading(true);
+        try {
             const img = new Image();
-            img.crossOrigin = "Anonymous";
-            img.onload = async () => {
-                currentImgElement = img;
-                await processImage(img);
-            };
-            img.src = url;
+            img.src = URL.createObjectURL(file);
+            await new Promise(r => img.onload = r);
+
+            // Limit Max Size for iPad Safety
+            let w = img.width, h = img.height;
+            const MAX_DIM = 1800; 
+            if(w > MAX_DIM || h > MAX_DIM) {
+                const ratio = Math.min(MAX_DIM/w, MAX_DIM/h);
+                w = Math.floor(w * ratio); h = Math.floor(h * ratio);
+            }
+
+            s.imgWidth = w; s.imgHeight = h;
+            
+            // Setup internal canvas sizes
+            [baseCanvas, effectCanvas, maskCanvas, interactionCanvas].forEach(c => { c.width = w; c.height = h; });
+            blurBuffer.canvas.width = w; blurBuffer.canvas.height = h;
+            logicalMaskBuffer.canvas.width = w; logicalMaskBuffer.canvas.height = h;
+
+            // Draw Base
+            baseCtx.drawImage(img, 0, 0, w, h);
+            
+            // Pre-compute: 正規化畳み込みで「毛を除外した肌色マップ」を生成
+            computeSkinColorMap(baseCtx, blurBuffer, w, h);
+
+            // Pre-compute average general skin color if possible, or wait for click
+            s.baseSkinColor = getAvgColor(baseCtx, {x:w/4, y:h/4, w:w/2, h:h/2});
+
+            hero.classList.add('hidden');
+            toolbar.classList.remove('hidden');
+            toolbar.classList.add('flex');
+            workspace.classList.remove('hidden');
+            workspace.classList.add('flex');
+            footerControls.classList.remove('hidden');
+
+            // Initialize display
+            s.undoStack = [];
+            clearMask(false);
+            
+            // Ensure browser layout is updated before calculating canvas fit
+            requestAnimationFrame(() => {
+                fitCanvasToView();
+            });
+
+            setIntensity(0);
+        } catch (e) {
+            console.error("loadImage error:", e);
+            alert("画像の読み込みに失敗しました。");
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    // --- UI Tools ---
+    function setTool(toolName) {
+        s.tool = toolName;
+        document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelector(`.tool-btn[data-tool="${toolName}"]`).classList.add('active');
+        
+        const bSlider = document.getElementById('brushSliderContainer');
+        const eSlider = document.getElementById('eraserSliderContainer');
+        if (bSlider) bSlider.classList.toggle('hidden', toolName !== 'smart');
+        if (eSlider) eSlider.classList.toggle('hidden', toolName !== 'eraser');
+
+        workspace.classList.remove('cursor-eraser', 'cursor-lasso', 'cursor-brush');
+        if(toolName === 'eraser') workspace.classList.add('cursor-eraser');
+        else if(toolName === 'lasso' || toolName === 'ai_lasso') workspace.classList.add('cursor-lasso');
+        else workspace.classList.add('cursor-brush');
+    }
+
+    function setIntensity(val) {
+        s.intensity = val;
+        document.getElementById('intensitySlider').value = val;
+        drawVisualMask(); // Trigger opacity update based on slider
+        renderEffect();
+
+        const feedback = document.getElementById('activeFeedback');
+        if (feedback) {
+            if (val > 0) feedback.classList.remove('opacity-0');
+            else feedback.classList.add('opacity-0');
+        }
+    }
+
+    function clearMask(save = true) {
+        if(save && s.imgWidth) saveState();
+        logicalMaskBuffer.clearRect(0,0, s.imgWidth, s.imgHeight);
+        drawVisualMask(); // updates maskCanvas
+        renderEffect();
+    }
+
+    // --- Compare ---
+    const compareBtn = document.getElementById('compareBtn');
+    compareBtn.onmousedown = compareBtn.ontouchstart = () => { effectCanvas.style.opacity = '0'; maskCanvas.style.opacity = '0'; };
+    compareBtn.onmouseup = compareBtn.ontouchend = compareBtn.onmouseleave = () => { effectCanvas.style.opacity = '1'; maskCanvas.style.opacity = '0.5'; };
+
+    // --- Viewport Scaling & Pan ---
+    window.addEventListener('resize', fitCanvasToView);
+    function fitCanvasToView() {
+        if(!s.imgWidth) return;
+        const cont = workspace.getBoundingClientRect();
+        const scale = Math.min(cont.width / s.imgWidth, cont.height / s.imgHeight);
+        s.scale = scale * 0.95; // 5% padding
+        
+        s.offsetX = (cont.width - s.imgWidth * s.scale) / 2;
+        s.offsetY = (cont.height - s.imgHeight * s.scale) / 2;
+
+        const transform = `translate(${s.offsetX}px, ${s.offsetY}px) scale(${s.scale})`;
+        [baseCanvas, effectCanvas, maskCanvas, interactionCanvas].forEach(c => c.style.transform = transform);
+    }
+
+    // --- Drawing Interaction ---
+    function getPos(e) {
+        const rect = workspace.getBoundingClientRect();
+        const touch = e.touches ? e.touches[0] : e;
+        const x = (touch.clientX - rect.left - s.offsetX) / s.scale;
+        const y = (touch.clientY - rect.top - s.offsetY) / s.scale;
+        return {x, y};
+    }
+
+    interactionCanvas.addEventListener('mousedown', startDraw);
+    interactionCanvas.addEventListener('touchstart', (e)=>{ e.preventDefault(); startDraw(e); }, {passive: false});
+    window.addEventListener('mousemove', moveDraw);
+    window.addEventListener('touchmove', moveDraw, {passive: false});
+    window.addEventListener('mouseup', endDraw);
+    window.addEventListener('touchend', endDraw);
+
+    function startDraw(e) {
+        if(!s.imgWidth || e.target !== interactionCanvas) return;
+        s.drawing = true;
+        saveState(); // Save state before modifying
+        const p = getPos(e);
+        s.lassoPoints = [p];
+
+        if(s.tool === 'smart') {
+            s.startColor = getPixelColor(baseCtx, p.x, p.y);
+            drawSmartStroke(p.x, p.y);
+        } else if(s.tool === 'eraser') {
+            drawEraserStroke(p.x, p.y);
+        }
+    }
+
+    function moveDraw(e) {
+        if(!s.drawing) return;
+        if(e.touches) e.preventDefault();
+        const p = getPos(e);
+
+        if(s.tool === 'smart') {
+            drawSmartStroke(p.x, p.y);
+        } else if(s.tool === 'eraser') {
+            drawEraserStroke(p.x, p.y);
+        } else if(s.tool === 'lasso' || s.tool === 'ai_lasso') {
+            s.lassoPoints.push(p);
+            drawLassoLine();
+        }
+    }
+
+    function endDraw(e) {
+        if(!s.drawing) return;
+        s.drawing = false;
+
+        if (s.tool === 'lasso' && s.lassoPoints.length > 2) {
+            fillLasso();
+        } else if (s.tool === 'ai_lasso' && s.lassoPoints.length > 0) {
+            fillAILasso();
         }
 
-        async function processImage(img) {
-            try {
-                // Fit Logic: Contain within the container
-                // We use the container size to determine canvas size
-                // For a side-by-side view, both canvases should match the image aspect ratio
-                // but fit within their respective containers.
+        interCtx.clearRect(0,0, s.imgWidth, s.imgHeight);
+        drawVisualMask();
+        
+        if(s.intensity > 0) renderEffect();
+    }
 
-                // However, for FaceAPI and pixel manipulation to work easily, 
-                // we usually set canvas size to exact image size (or scaled down) 
-                // and let CSS handle the 'object-contain' display.
-                // But FaceAPI results depend on coordinate space.
+    // --- Standard Brush Logic ---
+    function drawSmartStroke(cx, cy) {
+        const r = s.brushSize * 2; // Brush visual scale vs actual processing scale
+        
+        // Use a standard soft brush approach: simply draw a filled path onto the mask
+        // This is much easier to control than color-distance logic which can be fickle.
+        logicalMaskBuffer.globalCompositeOperation = 'source-over';
+        logicalMaskBuffer.beginPath();
+        logicalMaskBuffer.arc(cx, cy, r, 0, Math.PI*2);
+        
+        // Add a slight radial gradient for softer edges on the brush itself
+        const gradient = logicalMaskBuffer.createRadialGradient(cx, cy, r * 0.5, cx, cy, r);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        
+        logicalMaskBuffer.fillStyle = gradient;
+        logicalMaskBuffer.fill();
+        
+        // Real-time Visual Update
+        drawVisualMask();
+        if(s.intensity > 0) renderEffect();
+        
+        // Feedback while drawing (cursor outline)
+        interCtx.clearRect(0,0, s.imgWidth, s.imgHeight);
+        interCtx.beginPath(); interCtx.arc(cx, cy, r, 0, Math.PI*2);
+        interCtx.strokeStyle = 'rgba(255,255,0,0.5)'; interCtx.lineWidth = 2; interCtx.stroke();
+    }
 
-                // Approach:
-                // 1. Calculate a reasonable processing resolution (max 1024px height/width? or keep original?)
-                // Keeping original is best for quality, CSS handles view.
+    function drawEraserStroke(cx, cy) {
+        logicalMaskBuffer.globalCompositeOperation = 'destination-out';
+        logicalMaskBuffer.beginPath();
+        logicalMaskBuffer.arc(cx, cy, s.eraserSize * 2, 0, Math.PI*2);
+        logicalMaskBuffer.fillStyle = 'rgba(0,0,0,1)';
+        logicalMaskBuffer.fill();
+        logicalMaskBuffer.globalCompositeOperation = 'source-over';
 
-                let w = img.width;
-                let h = img.height;
+        // Real-time Visual Update
+        drawVisualMask();
+        if(s.intensity > 0) renderEffect();
 
-                // Limit max size for performance (iPad safari memory limit)
-                const MAX_DIM = 2048;
-                if (w > MAX_DIM || h > MAX_DIM) {
-                    const ratio = Math.min(MAX_DIM / w, MAX_DIM / h);
-                    w = Math.floor(w * ratio);
-                    h = Math.floor(h * ratio);
+        // Feedback while drawing (cursor outline)
+        interCtx.clearRect(0,0, s.imgWidth, s.imgHeight);
+        interCtx.beginPath(); interCtx.arc(cx, cy, s.eraserSize * 2, 0, Math.PI*2);
+        interCtx.strokeStyle = 'rgba(255,0,0,0.5)'; interCtx.lineWidth = 2; interCtx.stroke();
+    }
+
+    // --- Lasso Logic ---
+    function drawLassoLine() {
+        interCtx.clearRect(0,0, s.imgWidth, s.imgHeight);
+        interCtx.beginPath();
+        interCtx.moveTo(s.lassoPoints[0].x, s.lassoPoints[0].y);
+        for(let i=1; i<s.lassoPoints.length; i++) {
+            interCtx.lineTo(s.lassoPoints[i].x, s.lassoPoints[i].y);
+        }
+        
+        if (s.tool === 'ai_lasso') {
+            // Draw as a thick tracing line instead of a filled polygon
+            interCtx.strokeStyle = 'rgba(197,160,89, 0.8)';
+            interCtx.lineWidth = 10;
+            interCtx.lineCap = 'round';
+            interCtx.lineJoin = 'round';
+            interCtx.stroke();
+        } else {
+            // Standard Lasso Polygon
+            interCtx.strokeStyle = '#c5a059';
+            interCtx.lineWidth = 2;
+            interCtx.stroke();
+            interCtx.fillStyle = 'rgba(197,160,89,0.2)';
+            interCtx.fill();
+        }
+    }
+
+    function fillLasso() {
+        logicalMaskBuffer.beginPath();
+        logicalMaskBuffer.moveTo(s.lassoPoints[0].x, s.lassoPoints[0].y);
+        for(let i=1; i<s.lassoPoints.length; i++) logicalMaskBuffer.lineTo(s.lassoPoints[i].x, s.lassoPoints[i].y);
+        logicalMaskBuffer.closePath();
+        logicalMaskBuffer.fillStyle = 'rgba(255,255,255,1)';
+        logicalMaskBuffer.fill();
+    }
+
+    function fillAILasso() {
+        const w = s.imgWidth, h = s.imgHeight;
+        if(s.lassoPoints.length < 1) return;
+
+        // 1. Draw the user's seed onto a temporary invisible canvas
+        const tempCtx = document.createElement('canvas').getContext('2d', {willReadFrequently: true});
+        tempCtx.canvas.width = w; tempCtx.canvas.height = h;
+        
+        tempCtx.beginPath();
+        if(s.lassoPoints.length === 1) {
+            // It's a single click/tap. Use a small circle as the seed.
+            tempCtx.arc(s.lassoPoints[0].x, s.lassoPoints[0].y, 5, 0, Math.PI * 2);
+            tempCtx.fillStyle = '#FFFFFF';
+            tempCtx.fill();
+        } else {
+            tempCtx.moveTo(s.lassoPoints[0].x, s.lassoPoints[0].y);
+            for(let i=1; i<s.lassoPoints.length; i++) tempCtx.lineTo(s.lassoPoints[i].x, s.lassoPoints[i].y);
+            
+            // Thick stroke ensures we capture enough seed pixels
+            tempCtx.strokeStyle = '#FFFFFF';
+            tempCtx.lineWidth = 10;
+            tempCtx.lineCap = 'round';
+            tempCtx.lineJoin = 'round';
+            tempCtx.stroke();
+        }
+
+        // 3. To ignore noise (pores, single hairs), we'll read from a blurred version of the original
+        // instead of the raw sharp baseImage. This makes the flood fill much more stable.
+        const shapeData = tempCtx.getImageData(0, 0, w, h).data;
+        // 元画像のぼかし版を生成（blurBufferはインペインティング結果なので使えない）
+        const aiBlurCtx = document.createElement('canvas').getContext('2d');
+        aiBlurCtx.canvas.width = w; aiBlurCtx.canvas.height = h;
+        aiBlurCtx.drawImage(baseCanvas, 0, 0);
+        aiBlurCtx.filter = 'blur(3px)';
+        aiBlurCtx.drawImage(aiBlurCtx.canvas, 0, 0);
+        aiBlurCtx.filter = 'none';
+        const testData = aiBlurCtx.getImageData(0, 0, w, h).data;
+        const maskImgData = logicalMaskBuffer.getImageData(0, 0, w, h);
+        const maskData = maskImgData.data;
+
+        // 4. Calculate target average color of the drawn stroke using the smoothed data (testData)
+        let tr = 0, tg = 0, tb = 0, count = 0;
+        for(let i = 0; i < shapeData.length; i += 4) {
+            if(shapeData[i+3] > 0) { // is part of stroke
+                tr += testData[i]; tg += testData[i+1]; tb += testData[i+2];
+                count++;
+            }
+        }
+        if(count > 0) {
+            tr /= count; tg /= count; tb /= count;
+        } else {
+            if(!s.startColor) s.startColor = getPixelColor(baseCtx, s.lassoPoints[0].x, s.lassoPoints[0].y);
+            tr = s.startColor.r; tg = s.startColor.g; tb = s.startColor.b;
+        }
+
+        // Convert target to YCbCr for better perceptual distance calculation (especially for skin)
+        const tYcbcr = rgbToYcbcr(tr, tg, tb);
+
+        // 5. Hardcoded tolerance based on user testing (equivalent to slider at min value 10)
+        // This ensures maximum sensitivity to edges and colors like bedsheets.
+        const tolRGB = 10;
+        const tolYcbcr = Math.max(10, tolRGB * 0.7); // Tweak scale for YCbCr space
+
+        // 6. Unconstrained Global Flood Fill (Breadth First Search) expanding outwards
+        const maxPixels = w * h;
+        const q = new Int32Array(maxPixels * 2); 
+        const visited = new Uint8Array(maxPixels);
+        let head = 0, tail = 0;
+        
+        // Push ALL pixels from the drawn stroke into the queue to start expanding from multiple seeds simultaneously
+        for(let y=0; y<h; y++){
+            for(let x=0; x<w; x++){
+                const flatIdx = y * w + x;
+                const idx = flatIdx * 4;
+                if(shapeData[idx+3] > 0) {
+                    maskData[idx] = 255; maskData[idx+1] = 255; maskData[idx+2] = 255; maskData[idx+3] = 255;
+                    visited[flatIdx] = 1;
+                    q[tail++] = x;
+                    q[tail++] = y;
                 }
-
-                // Setup Canvases
-                mainCanvas.width = w;
-                mainCanvas.height = h;
-                beforeCanvas.width = w;
-                beforeCanvas.height = h;
-
-                // Draw Initial State
-                mainCtx.drawImage(img, 0, 0, w, h);
-                beforeCtx.drawImage(img, 0, 0, w, h); // Before view stays static
-
-                originalImageData = mainCtx.getImageData(0, 0, w, h);
-
-                // Detect Faces
-                const detections = await faceapi.detectAllFaces(mainCanvas, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
-
-                if (!detections || detections.length === 0) {
-                    alert("顔が見つかりませんでした");
-                    loadingOverlay.classList.add('hidden');
-                    return;
-                }
-
-                landmarks = detections[0].landmarks;
-                setupCorrectionData(); // Calculate skin color
-
-                // Reset Slider
-                updateSlider(0);
-                loadingOverlay.classList.add('hidden');
-
-            } catch (e) {
-                console.error(e);
-                alert("エラーが発生しました: " + e.message);
-                loadingOverlay.classList.add('hidden');
             }
         }
 
-        function updateSlider(val) {
-            intensitySlider.value = val;
-            intensityDisplay.innerText = val + "%";
-            window.requestAnimationFrame(() => render(val / 100));
+        // 7. BFS Loop checking neighboring pixels continuously until hitting a boundary edge
+        while(head < tail) {
+            const x = q[head++];
+            const y = q[head++];
+            
+            // Check 4 directions
+            if (x + 1 < w) checkNeighbor(x + 1, y);
+            if (x - 1 >= 0) checkNeighbor(x - 1, y);
+            if (y + 1 < h) checkNeighbor(x, y + 1);
+            if (y - 1 >= 0) checkNeighbor(x, y - 1);
         }
 
-        // --- Skin Color Logic (V5/V7) ---
-        function setupCorrectionData() {
-            if (!landmarks) return;
-            const leftEye = landmarks.getLeftEye();
-            const rightEye = landmarks.getRightEye();
+        function checkNeighbor(nx, ny) {
+            const flatIdx = ny * w + nx;
+            if(visited[flatIdx]) return;
+            visited[flatIdx] = 1; // Mark immediately to prevent duplicate queue entries
 
-            // Sampling areas
-            const lRect = { x: Math.floor(leftEye[0].x), y: Math.floor(leftEye[5].y + 10), w: 20, h: 20 };
-            const rRect = { x: Math.floor(rightEye[3].x - 20), y: Math.floor(rightEye[4].y + 10), w: 20, h: 20 };
+            const idx = flatIdx * 4;
+            // Read from blurred testData, not baseData
+            const cr = testData[idx], cg = testData[idx+1], cb = testData[idx+2];
+            
+            // Convert current pixel to YCbCr
+            const cYcbcr = rgbToYcbcr(cr, cg, cb);
 
-            const c1 = getAvgColor(lRect);
-            const c2 = getAvgColor(rRect);
-
-            // Choose brighter skin tone
-            const luma1 = 0.299 * c1.r + 0.587 * c1.g + 0.114 * c1.b;
-            const luma2 = 0.299 * c2.r + 0.587 * c2.g + 0.114 * c2.b;
-            const best = (luma1 > luma2) ? c1 : c2;
-
-            skinColor = `rgb(${best.r}, ${best.g}, ${best.b})`;
-
-            // Noise Texture
-            noiseTexture = createNoiseTexture(mainCanvas.width, mainCanvas.height, 0.45);
+            // Calculate distance emphasizing chroma (Cb/Cr) over luma (Y) to ignore shadows
+            // Weights: Luma (brightness) differences matter less than color differences for skin detection
+            const diffY = Math.abs(cYcbcr.y - tYcbcr.y) * 0.5; // Shadow tolerance
+            const diffCb = Math.abs(cYcbcr.cb - tYcbcr.cb) * 1.5; 
+            const diffCr = Math.abs(cYcbcr.cr - tYcbcr.cr) * 1.5;
+            
+            // Euclidean distance in weighted YCbCr space
+            const dist = Math.sqrt(diffY*diffY + diffCb*diffCb + diffCr*diffCr);
+            
+            if (dist <= tolYcbcr) {
+                // Fills area
+                maskData[idx] = 255; maskData[idx+1] = 255; maskData[idx+2] = 255; maskData[idx+3] = 255;
+                q[tail++] = nx;
+                q[tail++] = ny;
+            }
         }
 
-        function getAvgColor(r) {
+        // Apply updated pixels back to the main logical mask buffer
+        logicalMaskBuffer.putImageData(maskImgData, 0, 0);
+    }
+
+    // --- Render Effects ---
+    function drawVisualMask() {
+        // Yellow translucent overlay of the current mask
+        const w = s.imgWidth, h = s.imgHeight;
+        maskCtx.clearRect(0,0,w,h);
+        
+        // Tint it yellow
+        const temp = document.createElement('canvas').getContext('2d');
+        temp.canvas.width = w; temp.canvas.height = h;
+        temp.drawImage(logicalMaskBuffer.canvas, 0, 0);
+        temp.globalCompositeOperation = 'source-in';
+        temp.fillStyle = 'rgba(255, 230, 0, 0.4)'; // Lower base opacity so skin is visible during draw
+        temp.fillRect(0,0,w,h);
+        
+        maskCtx.drawImage(temp.canvas, 0, 0);
+        
+        // Hide mask completely if intensity > 0 to see effect properly
+        // Reveal mask (opacity = 1 of the 0.4 fill above) when intensity is 0
+        maskCanvas.style.opacity = s.intensity > 0 ? '0' : '1';
+    }
+
+    function renderEffect() {
+        if (!s.imgWidth) return;
+        const w = s.imgWidth, h = s.imgHeight;
+        const N = w * h;
+        const t = s.intensity / 100;
+        if (t <= 0) { effectCtx.clearRect(0, 0, w, h); return; }
+
+        // --- 周波数分離ベースの補正 ---
+        // blurBuffer = 周波数分離で毛を除去した「クリーン版」
+        // マスク範囲内の全ピクセルにクリーン版を均一適用
+        // 肌部分: clean ≈ original なので見た目は変わらない
+        // 毛部分: clean = 滑らかな肌色に置換される
+        // 毛の隙間: clean = スムージング済みで白い斑点が解消される
+
+        const cleanData = blurBuffer.getImageData(0, 0, w, h).data;
+        const maskData = logicalMaskBuffer.getImageData(0, 0, w, h).data;
+
+        const result = effectCtx.createImageData(w, h);
+        const out = result.data;
+
+        for (let i = 0; i < N; i++) {
+            const idx = i << 2;
+            const maskAlpha = maskData[idx + 3];
+            if (maskAlpha === 0) { out[idx + 3] = 0; continue; }
+
+            out[idx]     = cleanData[idx];
+            out[idx + 1] = cleanData[idx + 1];
+            out[idx + 2] = cleanData[idx + 2];
+            out[idx + 3] = Math.round(t * (maskAlpha / 255) * 255);
+        }
+
+        effectCtx.clearRect(0, 0, w, h);
+        effectCtx.putImageData(result, 0, 0);
+    }
+
+    // --- RGB to YCbCr conversion for better skin detection ---
+    function rgbToYcbcr(r, g, b) {
+        const y  =  0.299 * r + 0.587 * g + 0.114 * b;
+        const cb = -0.169 * r - 0.331 * g + 0.500 * b + 128;
+        const cr =  0.500 * r - 0.419 * g - 0.081 * b + 128;
+        return { y, cb, cr };
+    }
+
+    // --- AI Auto Masking (Hybrid: BodyPix + Color Flood) ---
+    // 1. BodyPix semantic segmentation accurately separates the person from the background (ignoring identical-colored sheets).
+    // 2. Color Flood Fill (Magic Wand) accurately separates skin from clothing (ignoring the blue shorts).
+    
+    let net = null;
+    async function initBodyPix() {
+        if (!net) {
             try {
-                const data = mainCtx.getImageData(r.x, r.y, r.w, r.h).data;
-                let R = 0, G = 0, B = 0, count = 0;
-                for (let i = 0; i < data.length; i += 4) {
-                    R += data[i]; G += data[i + 1]; B += data[i + 2]; count++;
-                }
-                return count ? { r: R / count, g: G / count, b: B / count } : { r: 220, g: 180, b: 160 };
-            } catch (e) { return { r: 220, g: 180, b: 160 }; }
+                // Using MobileNetV1 for faster real-time performance on browsers
+                net = await bodyPix.load({
+                    architecture: 'MobileNetV1',
+                    outputStride: 16,
+                    multiplier: 0.75,
+                    quantBytes: 2
+                });
+                console.log("BodyPix Loaded");
+            } catch(e) {
+                console.error("BodyPix Load Error:", e);
+                alert("AIモデルの読み込みに失敗しました。");
+                setLoading(false);
+            }
         }
+    }
 
-        // --- Render V7.4 Logic (iPad Bug Fix - Manual Blur) ---
-        function applyManualBlur(ctx, width, height, radius) {
-            const imgData = ctx.getImageData(0, 0, width, height);
+    async function runAIAutoMask() {
+        if(!s.imgWidth) return;
+        setLoading(true);
+
+        // Give UI time to show loader
+        await new Promise(r => setTimeout(r, 50)); 
+
+        try {
+            await initBodyPix();
+            if(!net) { setLoading(false); return; }
+
+            const w = s.imgWidth, h = s.imgHeight;
+            const imgData = baseCtx.getImageData(0, 0, w, h);
             const data = imgData.data;
-            const w = width;
-            const h = height;
+            
+            const maskImgData = logicalMaskBuffer.getImageData(0, 0, w, h);
+            const maskData = maskImgData.data;
 
-            // Simple Box Blur implementation (faster than Gaussian for manual calc)
-            // Need to do this horizontally then vertically
-            const passes = 2; // more passes = closer to gaussian, but slower
+            // 1. Semantic Mask: Find where the "Person" is, even if it includes clothes.
+            // By using a very low threshold and high resolution, we allow the AI to recognize
+            // heavily cropped body parts (like just a knee). The Color filter will safely trim the rest.
+            const segmentation = await net.segmentPerson(baseCanvas, {
+                internalResolution: 'high',
+                segmentationThreshold: 0.05 
+            });
 
-            // Create temporary buffer to avoid allocating inside loop
-            const temp = new Uint8ClampedArray(data.length);
+            // 2. Clear existing mask
+            logicalMaskBuffer.clearRect(0,0,w,h);
 
-            for (let pass = 0; pass < passes; pass++) {
-                // Horizontal pass
-                for (let y = 0; y < h; y++) {
-                    for (let x = 0; x < w; x++) {
-                        let r = 0, g = 0, b = 0, a = 0, count = 0;
-                        for (let ix = -radius; ix <= radius; ix++) {
-                            const curX = x + ix;
-                            if (curX >= 0 && curX < w) {
-                                const idx = (y * w + curX) * 4;
-                                r += data[idx];
-                                g += data[idx + 1];
-                                b += data[idx + 2];
-                                a += data[idx + 3];
-                                count++;
-                            }
+            // 3. Tolerance from UI slider
+            const tol = parseInt(document.getElementById('aiToleranceSlider').value, 10);
+
+            // 4. Multi-seed approach to get base colors (Top, Center, Bottom)
+            const cx = Math.floor(w / 2);
+            const seeds = [
+                {x: cx, y: Math.floor(h * 0.25)},
+                {x: cx, y: Math.floor(h * 0.50)},
+                {x: cx, y: Math.floor(h * 0.75)}
+            ];
+
+            const targets = [];
+            // We enforce the center seed [1] always runs as a fallback, 
+            // the others only run if BodyPix thinks it's part of a person.
+            for(let i=0; i<seeds.length; i++) {
+                const seed = seeds[i];
+                const flatIdx = seed.y * w + seed.x;
+                if(segmentation.data[flatIdx] === 1 || i === 1) { 
+                    const idx = flatIdx * 4;
+                    targets.push({r: data[idx], g: data[idx+1], b: data[idx+2]});
+                }
+            }
+
+            // 5. Global Color Threshold (Constrained by BodyPix)
+            // Instead of a connected flood fill, we evaluate every pixel. 
+            // This ensures we catch BOTH legs even if they are separated by clothes/shadows.
+            for(let i = 0; i < w * h; i++) {
+                // If it's a person (or tolerance is cranked up enough to bypass BodyPix)
+                if(segmentation.data[i] === 1 || tol > 100) {
+                    const idx = i * 4;
+                    const cr = data[idx], cg = data[idx+1], cb = data[idx+2];
+                    
+                    let match = false;
+                    for(let t of targets) {
+                        const diffR = Math.abs(cr - t.r);
+                        const diffG = Math.abs(cg - t.g);
+                        const diffB = Math.abs(cb - t.b);
+                        if (Math.max(diffR, diffG, diffB) <= tol) {
+                            match = true;
+                            break;
                         }
-                        const outIdx = (y * w + x) * 4;
-                        temp[outIdx] = r / count;
-                        temp[outIdx + 1] = g / count;
-                        temp[outIdx + 2] = b / count;
-                        temp[outIdx + 3] = a / count;
+                    }
+
+                    if (match) {
+                        maskData[idx] = 255; maskData[idx+1] = 255; maskData[idx+2] = 255; maskData[idx+3] = 255;
                     }
                 }
+            }
 
-                // Vertical pass
-                for (let x = 0; x < w; x++) {
-                    for (let y = 0; y < h; y++) {
-                        let r = 0, g = 0, b = 0, a = 0, count = 0;
-                        for (let iy = -radius; iy <= radius; iy++) {
-                            const curY = y + iy;
-                            if (curY >= 0 && curY < h) {
-                                const idx = (curY * w + x) * 4;
-                                r += temp[idx];
-                                g += temp[idx + 1];
-                                b += temp[idx + 2];
-                                a += temp[idx + 3];
-                                count++;
-                            }
-                        }
-                        const outIdx = (y * w + x) * 4;
-                        data[outIdx] = r / count;
-                        data[outIdx + 1] = g / count;
-                        data[outIdx + 2] = b / count;
-                        data[outIdx + 3] = a / count;
+            // Put it back
+            logicalMaskBuffer.putImageData(maskImgData, 0, 0);
+
+            // Update UI
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`.tool-btn[data-tool="ai"]`).classList.add('active');
+            workspace.classList.remove('cursor-eraser', 'cursor-lasso', 'cursor-brush');
+
+            drawVisualMask(); // Shows the yellow highlight
+            if(s.intensity > 0) renderEffect();
+
+        } catch(e) {
+            console.error("Auto Mask Error:", e);
+            alert("処理中にエラーが発生しました。");
+        }
+
+        setLoading(false);
+    }
+
+    // --- Helpers ---
+    function getPixelColor(ctx, x, y) {
+        try {
+            const data = ctx.getImageData(Math.floor(x), Math.floor(y), 1, 1).data;
+            return {r:data[0], g:data[1], b:data[2]};
+        } catch(e) { return s.baseSkinColor; }
+    }
+    
+    function getAvgColor(ctx, r) {
+        try {
+            const data = ctx.getImageData(r.x, r.y, r.w, r.h).data;
+            let R=0,G=0,B=0, count=0;
+            for(let i=0; i<data.length; i+=16) { // check every 4th pixel for speed
+                if(data[i+3]>0){ R+=data[i]; G+=data[i+1]; B+=data[i+2]; count++; }
+            }
+            if(!count) return {r:220, g:180, b:160};
+            return {r:R/count, g:G/count, b:B/count};
+        } catch(e) { return {r:220, g:180, b:160}; }
+    }
+
+    function createNoiseTexture(w, h, alpha) {
+        const nc = document.createElement('canvas'); nc.width = w; nc.height = h;
+        const ctx = nc.getContext('2d');
+        const imgD = ctx.createImageData(w, h);
+        const data = imgD.data;
+        for (let i = 0; i < data.length; i += 4) {
+            const v = (Math.random() - 0.5) * 255;
+            data[i] = data[i+1] = data[i+2] = v > 0 ? 255 : 0;
+            data[i+3] = Math.abs(v) * alpha;
+        }
+        ctx.putImageData(imgD, 0, 0);
+        return nc;
+    }
+
+    function applyDilation(ctx, width, height, radius) {
+        // Maximum Filter (Dilation): Erases dark lines (hair) by replacing them with local bright pixels (skin)
+        const imgData = ctx.getImageData(0,0, width, height);
+        const data = imgData.data;
+        const temp = new Uint8ClampedArray(data.length);
+        const w = width, h = height;
+
+        // Horizontal Pass
+        for(let y=0; y<h; y++){
+            for(let x=0; x<w; x++){
+                let maxL = -1, mr=0, mg=0, mb=0;
+                for(let ix=-radius; ix<=radius; ix++){
+                    let cx = x+ix; if(cx>=0 && cx<w){
+                        let id=(y*w+cx)<<2;
+                        let L = data[id]*0.3 + data[id+1]*0.6 + data[id+2]*0.1; // Simple Luma
+                        if (L > maxL) { maxL=L; mr=data[id]; mg=data[id+1]; mb=data[id+2]; }
+                    }
+                }
+                let out=(y*w+x)<<2;
+                temp[out]=mr; temp[out+1]=mg; temp[out+2]=mb; temp[out+3]=255;
+            }
+        }
+        // Vertical Pass
+        for(let x=0; x<w; x++){
+            for(let y=0; y<h; y++){
+                let maxL = -1, mr=0, mg=0, mb=0;
+                for(let iy=-radius; iy<=radius; iy++){
+                    let cy = y+iy; if(cy>=0 && cy<h){
+                        let id=(cy*w+x)<<2;
+                        let L = temp[id]*0.3 + temp[id+1]*0.6 + temp[id+2]*0.1;
+                        if (L > maxL) { maxL=L; mr=temp[id]; mg=temp[id+1]; mb=temp[id+2]; }
+                    }
+                }
+                let out=(y*w+x)<<2;
+                data[out]=mr; data[out+1]=mg; data[out+2]=mb; data[out+3]=255;
+            }
+        }
+        ctx.putImageData(imgData,0,0);
+    }
+
+    // --- 周波数分離（Frequency Separation）による毛除去 ---
+    //
+    // プロの写真レタッチで使われる手法。
+    //
+    // 原理:
+    //   低周波(blur) = 肌色トーン・影・グラデーション
+    //   高周波(original - blur) = ディテール（毛は負の値、肌テクスチャは正の値）
+    //   → 高周波の負の値だけクランプ = 毛だけが除去され、肌テクスチャは完全保持
+    //   → result = 低周波 + クランプ済み高周波
+    //
+    // 利点:
+    //   - 肌テクスチャ完全保持（正の高周波はそのまま）
+    //   - 滑らかな結果（パッチワーク・ムラなし）
+    //   - コードがシンプル
+    //
+    function computeSkinColorMap(srcCtx, dstCtx, width, height) {
+        const w = width, h = height;
+        const N = w * h;
+        const srcImgData = srcCtx.getImageData(0, 0, w, h);
+        const srcData = srcImgData.data;
+
+        // 各チャンネルをFloat32に展開
+        const channels = [new Float32Array(N), new Float32Array(N), new Float32Array(N)];
+        for (let i = 0; i < N; i++) {
+            const idx = i << 2;
+            channels[0][i] = srcData[idx];
+            channels[1][i] = srcData[idx + 1];
+            channels[2][i] = srcData[idx + 2];
+        }
+
+        // 反復周波数分離（8パス）
+        // 各パスで残った毛の跡がさらに除去される
+        const PASSES = 8;
+        const BLUR_RADIUS = 35; // 大きめ半径で濃い毛領域のムラを解消
+        const THRESHOLD = 0;
+
+        for (let pass = 0; pass < PASSES; pass++) {
+            for (let c = 0; c < 3; c++) {
+                const lowFreq = new Float32Array(channels[c]);
+                boxBlurFloat(lowFreq, w, h, BLUR_RADIUS);
+
+                for (let i = 0; i < N; i++) {
+                    const hf = channels[c][i] - lowFreq[i];
+                    if (hf < -THRESHOLD) {
+                        channels[c][i] = lowFreq[i] - THRESHOLD;
                     }
                 }
             }
-
-            ctx.putImageData(imgData, 0, 0);
         }
 
-        function applySafeBlur(targetCtx, sourceCanvas, radius) {
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
+        // 仕上げ：修正量の「周辺平均」に基づくスムージング
+        // 毛の隙間の明るいピクセルも、周囲に大きな修正がある場合はスムージング対象にする
+        // → 毛の隙間の明るい斑点が平滑化される
 
-            if (isIOS) {
-                // For iOS, completely avoid ctx.filter and use manual pixel manipulation
-                // Downscale massively to make manual blur performant enough
-                const scale = 0.25;
-                const dw = Math.max(1, Math.floor(sourceCanvas.width * scale));
-                const dh = Math.max(1, Math.floor(sourceCanvas.height * scale));
+        // まず修正量マップを作成（輝度ベースで1つだけ計算）
+        const correctionMap = new Float32Array(N);
+        for (let i = 0; i < N; i++) {
+            const idx = i << 2;
+            const lumaOrig = srcData[idx]*0.299 + srcData[idx+1]*0.587 + srcData[idx+2]*0.114;
+            const lumaClean = channels[0][i]*0.299 + channels[1][i]*0.587 + channels[2][i]*0.114;
+            correctionMap[i] = Math.max(0, lumaClean - lumaOrig);
+        }
+        // 修正量をぼかして「周辺にも修正がある」領域を検出
+        boxBlurFloat(correctionMap, w, h, 20);
 
-                const tmp = createOffscreenCanvas(dw, dh);
-                tmp.ctx.drawImage(sourceCanvas, 0, 0, dw, dh);
+        for (let c = 0; c < 3; c++) {
+            const smoothed = new Float32Array(channels[c]);
+            boxBlurFloat(smoothed, w, h, 12);
 
-                // Apply manual CPU-based blur
-                applyManualBlur(tmp.ctx, dw, dh, Math.max(1, Math.floor(radius * scale)));
-
-                // Draw back scaled up (browser handles interpolation)
-                targetCtx.drawImage(tmp.canvas, 0, 0, sourceCanvas.width, sourceCanvas.height);
-            } else {
-                targetCtx.save();
-                targetCtx.filter = `blur(${radius}px)`;
-                targetCtx.drawImage(sourceCanvas, 0, 0, sourceCanvas.width, sourceCanvas.height);
-                targetCtx.restore();
+            for (let i = 0; i < N; i++) {
+                const blendRatio = Math.min(1.0, correctionMap[i] / 5);
+                channels[c][i] = channels[c][i] * (1 - blendRatio) + smoothed[i] * blendRatio;
             }
         }
+        // テクスチャ転写：元画像の肌キメ（正の微細高周波）をクリーン版に加算
+        // blur半径3で非常に細かいディテール（毛穴・キメ）のみ抽出
+        // 毛（太い暗い線）は半径3のblurには影響しない
+        for (let c = 0; c < 3; c++) {
+            const origCh = new Float32Array(N);
+            for (let i = 0; i < N; i++) origCh[i] = srcData[(i << 2) + c];
 
-        function createMaskPath(ctx, w, h, points, isClosed = true) {
-            ctx.beginPath();
-            if (points && points.length > 0) {
-                ctx.moveTo(points[0].x, points[0].y);
-                for (let i = 1; i < points.length; i++) {
-                    ctx.lineTo(points[i].x, points[i].y);
-                }
-                if (isClosed) ctx.closePath();
-            }
-        }
+            const lowOrig = new Float32Array(origCh);
+            boxBlurFloat(lowOrig, w, h, 3);
 
-        function render(alpha) {
-            if (!originalImageData || !landmarks) return;
-
-            // 1. Reset
-            mainCtx.putImageData(originalImageData, 0, 0);
-            if (alpha <= 0) return;
-
-            const t = alpha;
-            const jaw = landmarks.getJawOutline();
-            const nose = landmarks.getNose();
-            const leftEye = landmarks.getLeftEye();
-            const rightEye = landmarks.getRightEye();
-            const mouth = landmarks.getMouth();
-
-            const w = mainCanvas.width;
-            const h = mainCanvas.height;
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
-
-            // Calculate center of face (approximate) - 鼻先（nose[3]）を正しい基準点に使用
-            const noseTip = nose[3];
-
-            // Create solid filled mask for the beard area
-            const beardMask = createOffscreenCanvas(w, h);
-
-            // 輪郭からのはみ出しを防ぎつつ、あご先（6〜10）だけ外側に拡張して黒残りを防ぐ
-            const beardShape = [];
-            for (let i = 0; i <= 16; i++) {
-                const p = jaw[i];
-                if (i >= 6 && i <= 10) {
-                    const dx = p.x - noseTip.x;
-                    const dy = p.y - noseTip.y;
-                    // アゴの底面だけ0.06（6%）外側に広げる
-                    beardShape.push({ x: p.x + dx * 0.06, y: p.y + dy * 0.06 });
-                } else {
-                    beardShape.push({ x: p.x, y: p.y });
-                }
-            }
-
-            // 頬上部（目の下付近）の境界を馴染ませるため、ベースマスクと頬上部マスクを分けて作成する
-            // 1. ベースのマスク（アゴ〜口周り・頬下部）
-            beardShape.push({ x: jaw[16].x, y: nose[8].y }); 
-            beardShape.push({ x: nose[8].x, y: nose[8].y + 5 });
-            
-            // 鼻下
-            beardShape.push({ x: nose[6].x, y: nose[6].y + 2 });
-            beardShape.push({ x: nose[4].x, y: nose[4].y + 5 });
-            
-            // 画像左側の頬・アゴへ
-            beardShape.push({ x: jaw[0].x, y: nose[4].y });
-
-            createMaskPath(beardMask.ctx, w, h, beardShape);
-            beardMask.ctx.fillStyle = 'rgba(255, 255, 255, 1)';
-            beardMask.ctx.fill();
-
-            // 2. 頬上部（目の下付近）専用のマスクを作成し、強くぼかして重ねることでグラデーション状に馴染ませる
-            // 左右のランドマークのねじれ（Criss-Cross）を完全に修正し、完全に対称なマスクを生成
-            const cheekMask = createOffscreenCanvas(w, h);
-            
-            // 【画面左側】の頬（jaw[0], rightEye, nose[4] を使用）
-            const leftCheek = [
-                { x: nose[4].x, y: nose[4].y - 5 },
-                { x: rightEye[3].x, y: Math.max(rightEye[4].y, rightEye[5].y) + 30 }, // 涙袋に入らないよう +18 から +30 に下げる
-                { x: jaw[0].x, y: Math.max(rightEye[4].y, rightEye[5].y) + 30 }, // 眼の下の高さで顔の輪郭へ
-                { x: jaw[0].x, y: nose[4].y }
-            ];
-            createMaskPath(cheekMask.ctx, w, h, leftCheek);
-            cheekMask.ctx.fillStyle = 'rgba(255, 255, 255, 1)';
-            cheekMask.ctx.fill();
-            
-            // 【画面右側】の頬（jaw[16], leftEye, nose[8] を使用）
-            const rightCheek = [
-                { x: jaw[16].x, y: nose[8].y },
-                { x: jaw[16].x, y: Math.max(leftEye[4].y, leftEye[5].y) + 30 }, // 眼の下の高さで顔の輪郭へ
-                { x: leftEye[0].x, y: Math.max(leftEye[4].y, leftEye[5].y) + 30 }, // 涙袋に入らないよう +18 から +30 に下げる
-                { x: nose[8].x, y: nose[8].y - 5 } 
-            ];
-            createMaskPath(cheekMask.ctx, w, h, rightCheek);
-            cheekMask.ctx.fillStyle = 'rgba(255, 255, 255, 1)';
-            cheekMask.ctx.fill();
-
-            // 頬上部だけ強いぼかし（半径30）を適用し、メインマスクに合成
-            const blurredCheeks = createOffscreenCanvas(w, h);
-            applySafeBlur(blurredCheeks.ctx, cheekMask.canvas, 30);
-            
-            beardMask.ctx.drawImage(blurredCheeks.canvas, 0, 0);
-
-            // Clear out lips and nose from the mask
-            beardMask.ctx.globalCompositeOperation = 'destination-out';
-            const outerLip = mouth.slice(0, 12);
-            createMaskPath(beardMask.ctx, w, h, outerLip);
-            beardMask.ctx.fillStyle = 'rgba(0,0,0,1)';
-            beardMask.ctx.fill();
-
-            // 鼻下側（上唇）はキワまで補正を効かせるため保護ストロークを描かない。
-            // 下唇と口角（mouthの6〜11、および0）にのみ保護ストロークを追加し、肌と同化するのを防ぐ。
-            beardMask.ctx.beginPath();
-            beardMask.ctx.moveTo(mouth[6].x, mouth[6].y);
-            for (let i = 7; i < 12; i++) {
-                beardMask.ctx.lineTo(mouth[i].x, mouth[i].y);
-            }
-            beardMask.ctx.lineTo(mouth[0].x, mouth[0].y); // 口の左端まで
-            
-            beardMask.ctx.lineWidth = 30; // 唇が小さく見えないよう、18から30に拡大して横・下を広く保護
-            beardMask.ctx.lineJoin = 'round';
-            beardMask.ctx.strokeStyle = 'rgba(0,0,0,1)';
-            beardMask.ctx.stroke();
-
-            const noseShape = [nose[0], nose[4], { x: nose[6].x, y: nose[6].y + 5 }, nose[8]];
-            createMaskPath(beardMask.ctx, w, h, noseShape);
-            beardMask.ctx.fill();
-            beardMask.ctx.lineWidth = 8;
-            beardMask.ctx.stroke();
-
-            beardMask.ctx.globalCompositeOperation = 'source-over';
-
-            // Blur the hard edges of this mask strongly (Set to 10 for smooth blending without excessive bleeding)
-            const finalMask = createOffscreenCanvas(w, h);
-            applySafeBlur(finalMask.ctx, beardMask.canvas, 10);
-
-            // ==========================================
-            // Heavy Beard Removal Effect Logic
-            // ==========================================
-            const effectLayer = createOffscreenCanvas(w, h);
-
-            // Step 1: "Melt" the dense hair. 
-            const heavyBlurLayer = createOffscreenCanvas(w, h);
-            heavyBlurLayer.ctx.drawImage(mainCanvas, 0, 0);
-            applySafeBlur(heavyBlurLayer.ctx, heavyBlurLayer.canvas, 10);
-
-            // Apply this blurred base to our effect layer
-            effectLayer.ctx.drawImage(heavyBlurLayer.canvas, 0, 0);
-
-            // Step 2: Targeted Mustache Boost (Lift dark blue/black shadows under nose)
-            // We create a very soft, blurry white patch over the mustache to screen the shadows up
-            const mustacheArea = createOffscreenCanvas(w, h);
-            const mPath = [
-                { x: nose[4].x - 15, y: nose[4].y },
-                { x: nose[8].x + 15, y: nose[8].y },
-                { x: mouth[6].x + 15, y: mouth[6].y + 25 }, // 下唇ラインまで大幅に拡張して上唇のキワのアルファ減衰を防ぐ
-                { x: mouth[0].x - 15, y: mouth[0].y + 25 }
-            ];
-            createMaskPath(mustacheArea.ctx, w, h, mPath);
-            mustacheArea.ctx.fillStyle = skinColor;
-            mustacheArea.ctx.fill();
-
-            // Blur it heavily so it's just a soft cloud of light
-            const softMustache = createOffscreenCanvas(w, h);
-            applySafeBlur(softMustache.ctx, mustacheArea.canvas, 15);
-
-            // Apply the soft mustache lift (スクリーンで明るく飛ばす)
-            effectLayer.ctx.globalCompositeOperation = 'screen';
-            // 鼻下の黒残りを消すため0.80 -> 0.95に強化
-            effectLayer.ctx.globalAlpha = Math.min(0.95, t * 0.95);
-            effectLayer.ctx.drawImage(softMustache.canvas, 0, 0);
-
-            // 追加: 仮想コンシーラー（青みを打ち消すオレンジ/ピーチ色）
-            const concealerLayer = createOffscreenCanvas(w, h);
-            concealerLayer.ctx.fillStyle = 'rgba(255, 150, 110, 1)'; // 青ヒゲを打ち消す暖色系
-            concealerLayer.ctx.fillRect(0, 0, w, h);
-            concealerLayer.ctx.globalCompositeOperation = 'destination-in';
-            concealerLayer.ctx.drawImage(softMustache.canvas, 0, 0);
-
-            // コンシーラーレイヤーをColor合成して根元の青グスミを解消する
-            // べた塗り感を減らすため0.70 -> 0.40に低減
-            effectLayer.ctx.globalCompositeOperation = 'color';
-            effectLayer.ctx.globalAlpha = Math.min(0.40, t * 0.40);
-            effectLayer.ctx.drawImage(concealerLayer.canvas, 0, 0);
-
-            // 鼻下を物理的に厚塗りしてさらにカバーを強固にする
-            effectLayer.ctx.globalCompositeOperation = 'normal';
-            // 人中の陰影を残すため、限界の1.0から0.60へ大幅にトーンダウン
-            effectLayer.ctx.globalAlpha = Math.min(0.60, t * 0.60);
-            effectLayer.ctx.drawImage(softMustache.canvas, 0, 0);
-
-            // Step 3: Global Shadow Lift (Reduced brightness to prevent bleeding)
-            effectLayer.ctx.globalCompositeOperation = 'screen';
-            effectLayer.ctx.fillStyle = skinColor;
-            effectLayer.ctx.globalAlpha = Math.min(0.10, t * 0.10);
-            effectLayer.ctx.fillRect(0, 0, w, h);
-
-            // Step 3.5: Physical Skin Fill (塗りつぶし処理の強化)
-            // Directly paint the skin color to cover hairs without brightening excessive areas
-            effectLayer.ctx.globalCompositeOperation = 'normal';
-            effectLayer.ctx.fillStyle = skinColor;
-            effectLayer.ctx.globalAlpha = Math.min(0.35, t * 0.35);
-            effectLayer.ctx.fillRect(0, 0, w, h);
-
-            // Step 4: Recolor to match the face skin.
-            effectLayer.ctx.globalCompositeOperation = 'soft-light';
-            effectLayer.ctx.fillStyle = skinColor;
-            effectLayer.ctx.globalAlpha = Math.min(0.50, t * 0.50);
-            effectLayer.ctx.fillRect(0, 0, w, h);
-
-            effectLayer.ctx.globalCompositeOperation = 'color';
-            // Strong color override
-            effectLayer.ctx.globalAlpha = Math.min(0.90, t * 0.90);
-            effectLayer.ctx.fillRect(0, 0, w, h);
-
-            // Step 5: Add artificial skin noise
-            if (noiseTexture) {
-                effectLayer.ctx.globalCompositeOperation = 'overlay';
-                effectLayer.ctx.globalAlpha = 0.15;
-                effectLayer.ctx.drawImage(noiseTexture, 0, 0);
-            }
-
-            // ==========================================
-            // Masking and Compositing
-            // ==========================================
-            if (isIOS) {
-                // Manual Alpha Masking via pixel manipulation
-                const effectData = effectLayer.ctx.getImageData(0, 0, w, h);
-                const maskData = finalMask.ctx.getImageData(0, 0, w, h);
-
-                for (let i = 0; i < effectData.data.length; i += 4) {
-                    effectData.data[i + 3] = (effectData.data[i + 3] * maskData.data[i]) / 255;
-                }
-                effectLayer.ctx.putImageData(effectData, 0, 0);
-
-                mainCtx.globalAlpha = t;
-                mainCtx.drawImage(effectLayer.canvas, 0, 0);
-                mainCtx.globalAlpha = 1.0;
-            } else {
-                // PC / Modern Android
-                effectLayer.ctx.globalCompositeOperation = 'destination-in';
-                effectLayer.ctx.globalAlpha = 1.0;
-                effectLayer.ctx.drawImage(finalMask.canvas, 0, 0);
-
-                mainCtx.globalAlpha = t;
-                mainCtx.drawImage(effectLayer.canvas, 0, 0);
-                mainCtx.globalAlpha = 1.0;
-            }
-        }
-
-        // --- Helpers ---
-        intensitySlider.addEventListener('input', (e) => updateSlider(e.target.value));
-
-        function resetApp() { window.location.reload(); }
-
-        function createOffscreenCanvas(w, h) {
-            const c = document.createElement('canvas');
-            c.width = w; c.height = h;
-            return { canvas: c, ctx: c.getContext('2d') };
-        }
-
-        function createNoiseTexture(w, h, amount) {
-            const c = document.createElement('canvas');
-            c.width = w; c.height = h;
-            const x = c.getContext('2d');
-            const id = x.createImageData(w, h);
-            const d = id.data;
-            for (let i = 0; i < d.length; i += 4) {
-                const v = 128 + (Math.random() - 0.5) * 255 * amount;
-                d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255;
-            }
-            x.putImageData(id, 0, 0);
-            return c;
-        }
-
-        // Camera Logic
-        const cameraModal = document.getElementById('cameraModal');
-        const videoEl = document.getElementById('videoElement');
-        let stream = null;
-        let currentFacingMode = 'user'; // 'user' (front) or 'environment' (back)
-
-        // Add switch button dynamically (or we could have added to HTML, but let's just insert it here for safety to avoid matching errors)
-        if (!document.getElementById('switchCameraBtn')) {
-            const btn = document.createElement('button');
-            btn.id = 'switchCameraBtn';
-            btn.onclick = switchCamera;
-            btn.className = 'absolute top-8 left-8 text-white p-4 hover:bg-white/10 rounded-full z-20';
-            btn.title = 'Switch Camera';
-            btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>`;
-            document.getElementById('cameraModal').firstElementChild.appendChild(btn);
-        }
-
-        async function startCamera(facingMode = currentFacingMode) {
-            if (stream) {
-                stream.getTracks().forEach(t => t.stop());
-            }
-
-            try {
-                const constraints = { video: { facingMode: facingMode } };
-                stream = await navigator.mediaDevices.getUserMedia(constraints);
-                videoEl.srcObject = stream;
-
-                // Mirror video for front camera
-                if (facingMode === 'user') {
-                    videoEl.style.transform = 'scaleX(-1)';
-                } else {
-                    videoEl.style.transform = 'none';
-                }
-
-                currentFacingMode = facingMode;
-                cameraModal.classList.remove('hidden');
-            } catch (e) {
-                console.error("Camera Error:", e);
-                if (facingMode === 'environment') {
-                    alert("アウトカメラへの切り替えに失敗しました。対応していない可能性があります。");
-                    startCamera('user');
-                } else {
-                    alert("カメラへのアクセス設定をご確認ください。");
+            for (let i = 0; i < N; i++) {
+                const texture = origCh[i] - lowOrig[i];
+                // 正のテクスチャのみ加算（肌の明るいキメ）
+                // 負のテクスチャ（暗い毛の跡）は加算しない
+                if (texture > 0) {
+                    channels[c][i] = Math.min(255, channels[c][i] + texture * 0.6);
                 }
             }
         }
 
-        function switchCamera() {
-            const newMode = currentFacingMode === 'user' ? 'environment' : 'user';
-            startCamera(newMode);
+        // 結果を出力
+        const result = dstCtx.createImageData(w, h);
+        const out = result.data;
+        for (let i = 0; i < N; i++) {
+            const idx = i << 2;
+            out[idx]     = Math.round(Math.min(255, Math.max(0, channels[0][i])));
+            out[idx + 1] = Math.round(Math.min(255, Math.max(0, channels[1][i])));
+            out[idx + 2] = Math.round(Math.min(255, Math.max(0, channels[2][i])));
+            out[idx + 3] = 255;
+        }
+        dstCtx.putImageData(result, 0, 0);
+        console.log(`[computeSkinColorMap] 周波数分離+テクスチャ転写完了`);
+    }
+
+    // O(N) の高速ボックスブラー（ランニングサム方式）
+    function boxBlurFloat(arr, w, h, radius) {
+        const temp = new Float32Array(arr.length);
+
+        // 水平パス
+        for (let y = 0; y < h; y++) {
+            const row = y * w;
+            let sum = 0, count = 0;
+            for (let x = 0; x <= radius && x < w; x++) { sum += arr[row + x]; count++; }
+            for (let x = 0; x < w; x++) {
+                temp[row + x] = sum / count;
+                const right = x + radius + 1;
+                const left = x - radius;
+                if (right < w) { sum += arr[row + right]; count++; }
+                if (left >= 0) { sum -= arr[row + left]; count--; }
+            }
         }
 
-        // Expose for Hero Button
-        window.startCameraFromHero = () => startCamera('user');
-
-        function closeCamera() {
-            if (stream) {
-                stream.getTracks().forEach(t => t.stop());
-                stream = null;
+        // 垂直パス
+        for (let x = 0; x < w; x++) {
+            let sum = 0, count = 0;
+            for (let y = 0; y <= radius && y < h; y++) { sum += temp[y * w + x]; count++; }
+            for (let y = 0; y < h; y++) {
+                arr[y * w + x] = sum / count;
+                const bottom = y + radius + 1;
+                const top = y - radius;
+                if (bottom < h) { sum += temp[bottom * w + x]; count++; }
+                if (top >= 0) { sum -= temp[top * w + x]; count--; }
             }
-            cameraModal.classList.add('hidden');
         }
+    }
 
-        document.getElementById('shutterBtn').addEventListener('click', () => {
-            const c = document.createElement('canvas');
-            c.width = videoEl.videoWidth; c.height = videoEl.videoHeight;
-            const ctx = c.getContext('2d');
+    function applyManualBlur(ctx, width, height, radius) {
+        // Fast Box Blur
+        const imgData = ctx.getImageData(0,0, width, height);
+        const data = imgData.data;
+        const temp = new Uint8ClampedArray(data.length);
+        const w = width, h = height;
 
-            if (currentFacingMode === 'user') {
-                ctx.translate(c.width, 0);
-                ctx.scale(-1, 1);
+        for(let pass=0; pass<1; pass++){
+            // H
+            for(let y=0; y<h; y++){
+                for(let x=0; x<w; x++){
+                    let r=0,g=0,b=0,a=0, count=0;
+                    for(let ix=-radius; ix<=radius; ix++){
+                        let cx = x+ix; if(cx>=0 && cx<w){
+                            let id=(y*w+cx)<<2;
+                            r+=data[id]; g+=data[id+1]; b+=data[id+2]; a+=data[id+3]; count++;
+                        }
+                    }
+                    let out=(y*w+x)<<2;
+                    temp[out]=r/count; temp[out+1]=g/count; temp[out+2]=b/count; temp[out+3]=a/count;
+                }
             }
+            // V
+            for(let x=0; x<w; x++){
+                for(let y=0; y<h; y++){
+                    let r=0,g=0,b=0,a=0, count=0;
+                    for(let iy=-radius; iy<=radius; iy++){
+                        let cy = y+iy; if(cy>=0 && cy<h){
+                            let id=(cy*w+x)<<2;
+                            r+=temp[id]; g+=temp[id+1]; b+=temp[id+2]; a+=temp[id+3]; count++;
+                        }
+                    }
+                    let out=(y*w+x)<<2;
+                    data[out]=r/count; data[out+1]=g/count; data[out+2]=b/count; data[out+3]=a/count;
+                }
+            }
+        }
+        ctx.putImageData(imgData,0,0);
+    }
 
-            ctx.drawImage(videoEl, 0, 0);
-            loadImage(c.toDataURL());
-            closeCamera();
-        });
-
-        document.getElementById('downloadBtn').addEventListener('click', () => {
-            const link = document.createElement('a');
-            link.download = 'rinx_after.png';
-            link.href = mainCanvas.toDataURL();
-            link.click();
-        });
-
-    </script>
+    function setLoading(show) { document.getElementById('loading').style.display = show ? 'flex' : 'none'; }
+    function resetApp() { location.reload(); }
+    
+    function downloadImage() {
+        if(!s.imgWidth) return;
+        const dlCanvas = document.createElement('canvas');
+        dlCanvas.width = s.imgWidth;dlCanvas.height = s.imgHeight;
+        const dlCtx = dlCanvas.getContext('2d');
+        dlCtx.drawImage(baseCanvas, 0,0);
+        dlCtx.drawImage(effectCanvas, 0,0);
+        
+        const link = document.createElement('a');
+        link.download = `rinx_body_simulator_${Date.now()}.jpg`;
+        link.href = dlCanvas.toDataURL('image/jpeg', 0.9);
+        link.click();
+    }
+</script>
 </body>
-
 </html>
-
-
